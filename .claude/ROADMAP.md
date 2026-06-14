@@ -42,8 +42,14 @@ auth.py
 
 ## 📐 FAZLAR (her fazın BİTTİ ŞARTI var)
 
-### F0 — İskelet ✅ (kuruldu)
-requirements/.gitignore/.env.example/README/.claude hazır. **BİTTİ.**
+### F0 — İskelet + ÇALIŞAN TEMEL ✅ (Zenco Baba kurdu + DOĞRULADI)
+Hazır ve test edilmiş (loop bunların ÜSTÜNE inşa eder, sıfırdan değil):
+- `.venv` kuruldu, requirements yüklü (Flask 3.1, spotipy 2.26, pytest 9, requests, dotenv).
+- `spotify_organizer/app.py` — Flask, DEMO modu; `/api/me`, `/api/playlists`, `/api/playlist/<id>` fixture döndürüyor (curl ile doğrulandı). Port **5055** (Mac AirPlay 5000'i kapıyor), reloader kapalı.
+- `spotify_organizer/fixtures.py` — DEMO veri (4 playlist, 17 şarkı, genres+bpm+camelot dahil).
+- `web/` — Vite 8 + React + Tailwind 4 koyu tema panel; `App.jsx` sidebar+şarkı listesi `/api`'den çekiyor. `npm run build` TEMİZ. `vite.config.js` `/api`'yi 5055'e proxy'liyor.
+- Uçtan uca doğrulandı: vite(5173) → proxy → backend(5055) → demo veri akıyor.
+**BİTTİ.** Sıradaki: F1'den itibaren ÖZELLİK MANTIĞINI bu çalışan temele ekle.
 
 ### F1 — Çekirdek motor (saf Python)
 client Protocol + `tests/mock_client.py` + `fixtures.py` (DEMO) + `genre.py` (kovala/normalize) + `enrich.py` (GetSongBPM client + cache + mock) + `order.py` (Camelot çark + greedy harmonic sıra). GetSongBPM/spotipy formatını context7/WebFetch ile doğrula.
@@ -54,9 +60,9 @@ client Protocol + `tests/mock_client.py` + `fixtures.py` (DEMO) + `genre.py` (ko
 `GET /api/me`, `GET /api/playlists`, `GET /api/playlist/<id>`, `POST /api/split-genre/preview|apply`, `POST /api/order/preview|apply`. DEMO modu fixture döndürür. Gerçek modda spotipy.
 **BİTTİ:** backend testleri yeşil; DEMO=1 ile tüm endpoint'ler fixture cevabı veriyor; apply mock'ta doğru çağrı + backup yazıyor.
 
-### F3 — Frontend (React panel, koyu tema)
-Vite+Tailwind kur. Sol: playlist listesi. Sağ: seçili playlist şarkıları + "Türe Göre Ayır" / "Geçişli Sırala" butonları. Önizleme paneli (kovalar / yeni sıra) → "Uygula" onay diyaloğu. Loading/empty/error state'leri. `/api`'ye bağlan.
-**BİTTİ:** `npm run build` başarılı; DEMO backend'le panel uçtan uca çalışıyor (önizle→uygula akışı demo veride görünür).
+### F3 — Frontend (MEVCUT `web/` paneline ekle — sıfırdan kurma)
+Panel + sidebar + şarkı listesi + 2 buton ZATEN var (`web/src/App.jsx`). YAPILACAK: butonları F2 endpoint'lerine bağla → Önizleme paneli (kovalar / yeni sıra) + "Uygula" onay diyaloğu. `comingSoon()` placeholder'ını gerçek akışla değiştir.
+**BİTTİ:** `npm run build` başarılı; DEMO backend'le önizle→uygula akışı demo veride uçtan uca çalışıyor.
 
 ### F4 — Güvenlik + apply cilası
 Apply onay diyaloğu, backup, "geri dönüşü zor" uyarısı; dry-run/preview varsayılan akış; hata mesajları kullanıcı-dostu.
