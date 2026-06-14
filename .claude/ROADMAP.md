@@ -1,87 +1,93 @@
-# ROADMAP — Spotify Playlist Organizer (WEB APP)
+# ROADMAP — Spotify Playlist Organizer (ÇOK İŞLEVLİ WEB APP)
 
 > Loop'un beyni. Her iterasyonda önce bunu oku. Kilitli kararlara dokunma.
 
 ## 🎯 Amaç
-Spotify tarzı **görsel web paneli** — Şef playlist'lerini görür, butonla düzenler:
-1. **Türe göre ayırma** — karışık liste / Beğenilenler → türe göre YENİ playlist'ler (orijinal dokunulmaz).
-2. **Geçişli sıralama** — bir playlist'i harmonic mixing (Camelot çarkı) + BPM rampası ile DJ mantığında sırala.
-UI: sol playlist listesi · sağ şarkı listesi + "Türe Ayır" / "Geçişli Sırala" butonları · Önizle → Uygula.
+Spotify tarzı **görsel, çok işlevli web paneli** ("Gece Stüdyosu" tasarımı). İşlevler:
+1. **Türe göre ayır** — karışık liste / Beğenilenler → türe göre YENİ playlist'ler.
+2. **Geçişli sırala (DJ)** — harmonic mixing (Camelot) + BPM rampası.
+3. **Tekrarları temizle** — duplicate bul & kaldır.
+4. **Çok-anahtarlı sırala** — sanatçı/albüm/eklenme/çıkış tarihi/popülerlik/BPM/süre/alfabetik.
+5. **Birleştir & Böl** — playlist'leri birleştir; on-yıla / tempo bölgesine / boyuta göre böl.
+6. **Keşif** — top şarkı/sanatçılardan playlist + katalog arama & ekleme.
+7. **İçgörüler** — tür/BPM/on-yıl dağılımı, en çok sanatçılar, ort. popülerlik (grafikler).
+8. **Yedek & Geri Al** — her apply öncesi otomatik yedek + restore.
 
 ## 🔒 KİLİTLİ KARARLAR (değiştirme = Şef onayı)
-1. **Stack:**
-   - **Backend:** Python + Flask (`app.py`) + spotipy + requests. Çekirdek mantık saf modüllerde.
-   - **Frontend:** React + Vite + Tailwind, **koyu tema** (360SMM "Aydınlık Derinlik" hissi). `web/` klasörü.
-2. **DEMO modu (kritik):** `DEMO=1` ile backend, fixture playlist'ler döndürür → **auth OLMADAN** panel tam çalışır. Sabah Şef açar, demo veriyle tıklar, türe-ayır + geçişli-sıra çalışır görür. Gerçek veri auth'tan sonra.
-3. **BPM/key kaynağı:** **GetSongBPM** (Şef onayladı). Spotify Audio Features Kasım 2024 kapandı, kullanma. Sonuç `cache/bpm.json`'a cache. README'de attribution ZORUNLU.
-4. **Tür kaynağı:** Sanatçı `genres` → ana kovalara normalize. Boş → "Diğer".
-5. **GÜVENLİK (en kritik):**
-   - Her işlem **önce ÖNİZLE (preview)**, sonra ayrı **Uygula (apply)** — apply'da onay diyaloğu.
-   - Apply öncesi kaynak listeyi `backups/<isim>-<ts>.json`'a yedekle.
-   - Türe-ayırma orijinali ASLA silmez; hep YENİ playlist.
-   - Beğenilenler reorder edilmez; okunup yeni playlist'lere kopyalanır.
-6. **Auth:** `auth.py` tek seferlik OAuth (loop ÇALIŞTIRMAZ, yazar). Scope: `playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read`. Redirect `http://127.0.0.1:8888/callback` (localhost değil).
-7. **Mimari:** Çekirdek saf fonksiyonlar (genre/order/enrich) + Protocol client → mock'la %100 test. Flask sadece ince kabuk.
+1. **Stack:** Backend Python+Flask+spotipy+requests. Frontend React+Vite+Tailwind v4. Çekirdek mantık saf modüllerde.
+2. **TASARIM DİLİ — "Gece Stüdyosu" (KİLİTLİ, mevcut `web/src/index.css` token'ları):**
+   - Renk: derin gece-siyahı (`--bg #08080b`), sıcak amber imza (`--amber #ffb24c`), serin teal ikincil, sahne-ışığı glow + film grain.
+   - Tipografi: Display=Bricolage Grotesque, Body=Hanken Grotesk, Mono=JetBrains Mono (BPM/Camelot/süre = mono).
+   - İmza: **Camelot renk çipleri** (`camelotColor()` `lib/api.js`), vinil disk logo, staggered `.reveal`.
+   - **Loop MEVCUT token + sınıfları (`.card .btn .btn-primary .btn-ghost .chip .nav-item .surface .reveal`) KULLANIR — yeni stil icat etmez.** Yeni AI-slop görünüm YASAK.
+3. **DEMO modu (`DEMO=1`):** fixture veriyle panel auth OLMADAN tam çalışır. Tüm yeni özellikler DEMO'da da çalışmalı (fixtures.py'de bpm/camelot/year/popularity var).
+4. **BPM/key kaynağı:** GetSongBPM (Spotify Audio Features Kasım 2024 kapandı). Cache `cache/bpm.json`. README attribution ZORUNLU.
+5. **Tür kaynağı:** sanatçı `genres` → ana kovalara normalize. Boş → "Diğer".
+6. **GÜVENLİK (en kritik):** Her işlem önce **Önizle (preview)**, sonra onaylı **Uygula (apply)**. Apply öncesi kaynak → `backups/<isim>-<ts>.json`. Türe-ayır/birleştir/böl orijinali silmez, hep YENİ playlist. Beğenilenler reorder edilmez (kopya playlist).
+7. **Auth:** `auth.py` tek seferlik OAuth (loop ÇALIŞTIRMAZ). Scope: `playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read user-top-read`. Redirect `http://127.0.0.1:8888/callback`.
 8. **Git:** branch `loop/v1`, **PUSH YOK**. Sırlar repoya GİRMEZ.
-9. **Mod:** CERRAH — gerçek API/auth YOK, her şey mock + DEMO fixture üstünde; backend pytest yeşil, frontend `npm run build` başarılı.
+9. **Mod:** CERRAH — gerçek API/auth YOK, her şey mock + DEMO fixture; backend pytest yeşil + `npm run build` temiz.
 
-## 📁 Yapı
+## 📁 Yapı (mevcut + loop ekleyecekleri)
 ```
 spotify_organizer/
-  client.py    # SpotifyClientProtocol + spotipy impl
-  fixtures.py  # DEMO veri (sahte playlist/şarkı/sanatçı)
-  genre.py     # tür kovalama + normalize
-  enrich.py    # GetSongBPM + cache
-  order.py     # Camelot harmonic order
-  service.py   # split_genre / order_playlist → preview + apply
-  app.py       # Flask API (+ build edilmiş frontend'i serve)
-web/           # React + Vite + Tailwind (koyu tema)
-tests/         # mock_client + pytest
-auth.py
+  app.py        ✅ Flask (DEMO). Loop: yeni endpoint'ler ekler.
+  fixtures.py   ✅ DEMO veri (bpm/camelot/year/popularity).
+  client.py     ← Protocol + spotipy impl  (loop)
+  genre.py      ← kovalama/normalize        (loop)
+  enrich.py     ← GetSongBPM + cache         (loop)
+  order.py      ← Camelot harmonic order     (loop)
+  organize.py   ← dedupe / sort / merge / split / insights  (loop)
+  service.py    ← preview+apply+backup orkestrasyonu  (loop)
+web/src/
+  index.css     ✅ Gece Stüdyosu token'ları (KİLİTLİ)
+  lib/api.js    ✅ api() + camelotColor() + fmtDuration()
+  App.jsx       ✅ shell + 4 bölüm navigasyonu
+  views/PlaylistsView.jsx  ✅ (butonlar placeholder → loop bağlar)
+  views/ToolsView.jsx      ✅ (8 araç kartı → loop bağlar)
+  views/InsightsView.jsx   ✅ (grafik iskeleti → loop gerçek veriyle)
+  views/BackupsView.jsx    ✅ (restore akışı → loop)
+tests/  ← mock_client + pytest (loop)
+auth.py ← tek seferlik OAuth (loop yazar, çalıştırmaz)
 ```
 
 ## 📐 FAZLAR (her fazın BİTTİ ŞARTI var)
 
-### F0 — İskelet + ÇALIŞAN TEMEL ✅ (Zenco Baba kurdu + DOĞRULADI)
-Hazır ve test edilmiş (loop bunların ÜSTÜNE inşa eder, sıfırdan değil):
-- `.venv` kuruldu, requirements yüklü (Flask 3.1, spotipy 2.26, pytest 9, requests, dotenv).
-- `spotify_organizer/app.py` — Flask, DEMO modu; `/api/me`, `/api/playlists`, `/api/playlist/<id>` fixture döndürüyor (curl ile doğrulandı). Port **5055** (Mac AirPlay 5000'i kapıyor), reloader kapalı.
-- `spotify_organizer/fixtures.py` — DEMO veri (4 playlist, 17 şarkı, genres+bpm+camelot dahil).
-- `web/` — Vite 8 + React + Tailwind 4 koyu tema panel; `App.jsx` sidebar+şarkı listesi `/api`'den çekiyor. `npm run build` TEMİZ. `vite.config.js` `/api`'yi 5055'e proxy'liyor.
-- Uçtan uca doğrulandı: vite(5173) → proxy → backend(5055) → demo veri akıyor.
-**BİTTİ.** Sıradaki: F1'den itibaren ÖZELLİK MANTIĞINI bu çalışan temele ekle.
+### F0 — İskelet + ÇALIŞAN TEMEL + TAM TASARLANMIŞ SHELL ✅ (Zenco Baba kurdu + GÖRSEL doğruladı)
+- `.venv`+deps; `app.py` DEMO backend (port 5055) curl'le doğrulandı; `fixtures.py` zengin demo.
+- `web/` Gece Stüdyosu paneli: 4 ekran (Playlist'ler/İçgörüler/Araçlar/Yedekler), Camelot çipleri, koyu tema. `npm run build` temiz; **4 ekran headless-chromium ile görsel doğrulandı** (loop UI'ı sıfırdan yapmaz, MANTIK doldurur).
+**BİTTİ.**
 
-### F1 — Çekirdek motor (saf Python)
-client Protocol + `tests/mock_client.py` + `fixtures.py` (DEMO) + `genre.py` (kovala/normalize) + `enrich.py` (GetSongBPM client + cache + mock) + `order.py` (Camelot çark + greedy harmonic sıra). GetSongBPM/spotipy formatını context7/WebFetch ile doğrula.
-**BİTTİ:** `pytest` yeşil — kovalama, enrich cache hit/miss, harmonic sıra (eksik-veri dahil) test edilmiş.
+### F1 — Çekirdek motor (saf Python + mock + test)
+`client.py` Protocol + spotipy impl + `tests/mock_client.py` (fixtures sarar). `genre.py`, `enrich.py` (GetSongBPM, mock), `order.py` (Camelot greedy). `organize.py`: dedupe, çok-anahtarlı sort, merge, split (on-yıl/tempo/boyut), insights aggregate (tür/bpm/on-yıl/top-sanatçı/ort-pop). API formatlarını context7/WebFetch ile DOĞRULA.
+**BİTTİ:** `pytest` yeşil — her işlev happy+edge (boş tür, eksik bpm, tek parça) test edilmiş.
 
-### F2 — Flask backend
-`service.py` (split_genre/order_playlist → preview+apply, backup) + `app.py` endpoint'leri:
-`GET /api/me`, `GET /api/playlists`, `GET /api/playlist/<id>`, `POST /api/split-genre/preview|apply`, `POST /api/order/preview|apply`. DEMO modu fixture döndürür. Gerçek modda spotipy.
-**BİTTİ:** backend testleri yeşil; DEMO=1 ile tüm endpoint'ler fixture cevabı veriyor; apply mock'ta doğru çağrı + backup yazıyor.
+### F2 — Backend endpoint'leri + güvenlik
+`service.py` (preview/apply + backup/restore). `app.py`'ye: `/api/split-genre/(preview|apply)`, `/api/order/(preview|apply)`, `/api/dedupe/...`, `/api/sort/...`, `/api/merge|split/...`, `/api/insights/<id>`, `/api/top`, `/api/search`, `/api/backups`, `/api/restore`. DEMO fixture + gerçek client.
+**BİTTİ:** backend testleri yeşil; DEMO'da tüm endpoint cevap veriyor; apply mock'ta backup yazıyor; onaysız mutasyon yok.
 
-### F3 — Frontend (MEVCUT `web/` paneline ekle — sıfırdan kurma)
-Panel + sidebar + şarkı listesi + 2 buton ZATEN var (`web/src/App.jsx`). YAPILACAK: butonları F2 endpoint'lerine bağla → Önizleme paneli (kovalar / yeni sıra) + "Uygula" onay diyaloğu. `comingSoon()` placeholder'ını gerçek akışla değiştir.
-**BİTTİ:** `npm run build` başarılı; DEMO backend'le önizle→uygula akışı demo veride uçtan uca çalışıyor.
+### F3 — Frontend bağlama (MEVCUT ekranlara — sıfırdan kurma)
+- PlaylistsView: 3 buton → preview modal + apply onay.
+- ToolsView: 8 kart → ilgili akış (merge/split için playlist seçici, sort için anahtar seçici, search için arama kutusu).
+- InsightsView: iskelet → `/api/insights` gerçek veriyle (SVG/CSS çubuk veya recharts).
+- BackupsView: `/api/backups` listesi + Geri Al.
+Mevcut tasarım token/sınıfları KULLAN.
+**BİTTİ:** `npm run build` temiz; DEMO'da her ekran uçtan uca çalışır (önizle→uygula görünür).
 
-### F4 — Güvenlik + apply cilası
-Apply onay diyaloğu, backup, "geri dönüşü zor" uyarısı; dry-run/preview varsayılan akış; hata mesajları kullanıcı-dostu.
-**BİTTİ:** apply'sız hiçbir mutasyon olmaz; onaysız apply yok; backup test edilmiş.
+### F4 — Güvenlik + UX cilası
+Apply onay diyaloğu + "geri dönüşü zor" uyarısı; her ekranda loading/empty/error; backup'tan restore; mikro-motion. Dry-run/preview varsayılan.
+**BİTTİ:** apply'sız mutasyon yok; restore çalışıyor (mock); durumlar pürüzsüz.
 
 ### F5 — Doğrulama
-Backend pytest tam yeşil + frontend build temiz + DEMO uçtan uca. (Opsiyonel: panel screenshot recipe ile görsel kontrol.)
-**BİTTİ:** her şey yeşil + DEMO panel açılıp çalışıyor.
+Backend pytest tam yeşil + `npm run build` temiz + DEMO'da 4 ekran + tüm araçlar uçtan uca. (Ops: headless-chromium screenshot ile görsel kontrol — reçete `/tmp/spo-shot` deseninde.)
+**BİTTİ:** her şey yeşil + DEMO panel tam işlevsel.
 
 ### F6 — Cila
 README (kurulum + GetSongBPM attribution + ekran akışı) + MORNING güncel + learned-errors dolu.
-**BİTTİ:** yabancı kurabilir netlikte; testler yeşil.
+**BİTTİ:** yabancı kurabilir; testler yeşil.
 
 ## 🧊 BACKLOG (Şef gerekli / loop YAPMAZ)
-- Gerçek OAuth (`python auth.py`) — tarayıcı, sadece Şef.
-- GetSongBPM gerçek key — Şef alır.
-- Deploy (şimdilik lokal çalışır).
-- Mood/enerji boyutu (GetSongBPM yetmezse).
-- Dev-mode 25-kişi sınırını aşma.
+Gerçek OAuth (`python auth.py`), gerçek GetSongBPM key, deploy, mood/enerji boyutu, dev-mode 25-kişi aşımı.
 
 ## ✅ "Loop bitti"
-F1–F6 BİTTİ; backend pytest yeşil; frontend build temiz; DEMO panel uçtan uca çalışıyor; MORNING güncel; gerçek-auth gerektiren her şey Backlog'da.
+F1–F6 BİTTİ; backend pytest yeşil; `npm run build` temiz; DEMO'da 8 işlev + 4 ekran uçtan uca; tasarım dili korunmuş; MORNING güncel.

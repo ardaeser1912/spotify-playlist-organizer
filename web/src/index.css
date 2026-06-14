@@ -1,9 +1,103 @@
 @import "tailwindcss";
 
+/* ===== Gece Stüdyosu — tasarım token'ları ===== */
+:root {
+  --bg: #08080b;
+  --bg-1: #0e0e13;
+  --bg-2: #15151d;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #ece9e4;
+  --dim: rgba(236, 233, 228, 0.56);
+  --faint: rgba(236, 233, 228, 0.34);
+  --amber: #ffb24c;
+  --amber-deep: #f59415;
+  --teal: #34d8c4;
+
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --r: 14px;
+  --r-sm: 10px;
+  --r-lg: 22px;
+  --shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+}
+
+* { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background: #0a0a0f;
-  color: #e7e7ea;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  position: relative;
 }
+
+/* sahne ışığı parıltısı */
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(255, 178, 76, 0.10), transparent 60%),
+    radial-gradient(80% 60% at 95% 115%, rgba(52, 216, 196, 0.055), transparent 60%);
+}
+/* film grain */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#root { position: relative; z-index: 2; }
+
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); background-clip: content-box; }
+
+/* ===== bileşen sınıfları ===== */
+.nav-item {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.6rem 0.8rem; border-radius: var(--r-sm);
+  color: var(--dim); font-weight: 500; font-size: 0.92rem;
+  cursor: pointer; transition: 0.18s; position: relative; width: 100%; text-align: left;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.nav-item.active { color: var(--text); background: rgba(255,178,76,0.10); }
+.nav-item.active::after {
+  content: ''; position: absolute; left: 0; top: 22%; bottom: 22%;
+  width: 3px; border-radius: 9px; background: var(--amber);
+}
+
+.btn {
+  font-family: var(--font-body); font-weight: 600; font-size: 0.9rem;
+  padding: 0.6rem 1rem; border-radius: var(--r-sm); cursor: pointer;
+  transition: 0.18s; border: 1px solid transparent;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+}
+.btn-primary { background: linear-gradient(180deg, var(--amber), var(--amber-deep)); color: #1a1206; box-shadow: 0 10px 26px -10px rgba(255,178,76,0.55); }
+.btn-primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn-ghost { background: rgba(255,255,255,0.04); border-color: var(--border-strong); color: var(--text); }
+.btn-ghost:hover { background: rgba(255,255,255,0.09); }
+
+.card { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); }
+.surface { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: var(--r); }
+
+.chip { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500; padding: 0.12rem 0.42rem; border-radius: 6px; }
+
+@keyframes reveal { to { opacity: 1; transform: none; } }
+.reveal { opacity: 0; transform: translateY(10px); animation: reveal 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+
+/* vinil disk logosu */
+@keyframes spin { to { transform: rotate(360deg); } }
+.disc {
+  width: 34px; height: 34px; border-radius: 50%; position: relative; flex: none;
+  background: radial-gradient(circle at 50% 50%, #2a2a32 0 20%, #0c0c11 21% 28%, #1b1b23 29% 100%);
+  box-shadow: 0 0 0 1px var(--border), 0 6px 18px -6px rgba(0,0,0,0.8);
+}
+.disc::after { content: ''; position: absolute; inset: 43%; border-radius: 50%; background: var(--amber); }
+.brand:hover .disc { animation: spin 6s linear infinite; }
