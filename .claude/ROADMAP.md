@@ -1,71 +1,81 @@
-# ROADMAP — Spotify Playlist Organizer
+# ROADMAP — Spotify Playlist Organizer (WEB APP)
 
 > Loop'un beyni. Her iterasyonda önce bunu oku. Kilitli kararlara dokunma.
 
 ## 🎯 Amaç
-Şef'in karışık playlist'lerini / Beğenilenler'ini düzenleyen bir lokal araç:
-1. **Türe göre ayırma** — karışık liste → türe göre YENİ playlist'ler (orijinal dokunulmaz).
+Spotify tarzı **görsel web paneli** — Şef playlist'lerini görür, butonla düzenler:
+1. **Türe göre ayırma** — karışık liste / Beğenilenler → türe göre YENİ playlist'ler (orijinal dokunulmaz).
 2. **Geçişli sıralama** — bir playlist'i harmonic mixing (Camelot çarkı) + BPM rampası ile DJ mantığında sırala.
+UI: sol playlist listesi · sağ şarkı listesi + "Türe Ayır" / "Geçişli Sırala" butonları · Önizle → Uygula.
 
-## 🔒 KİLİTLİ KARARLAR (değiştirme — değişiklik = Şef onayı)
-1. **Stack:** Python 3 + `spotipy` (Spotify) + `requests` (GetSongBPM) + `python-dotenv` + `pytest`.
-2. **BPM/key kaynağı:** **GetSongBPM** (Şef onayladı). Spotify Audio Features Kasım 2024'te kapatıldı, kullanma. GetSongBPM sonuçlarını `cache/bpm.json`'a cache'le. README'de attribution linki ZORUNLU (lisans şartı).
-3. **Tür kaynağı:** Sanatçı `genres` dizisi (Get Artist). Mikro-türleri ana kovalara normalize et. Türü boş → "Diğer".
-4. **GÜVENLİK (en kritik):**
-   - Her komut **varsayılan `--dry-run`**. Gerçek değişiklik SADECE `--apply` ile.
-   - `--apply` öncesi kaynak listeyi `backups/<isim>-<ts>.json`'a yedekle.
-   - Türe-ayırma orijinali ASLA silmez/değiştirmez, hep YENİ playlist üretir.
-   - Beğenilenler (saved tracks) reorder edilmez; sadece okunup yeni playlist'lere kopyalanır.
-5. **Auth:** `auth.py` tek seferlik OAuth (loop bunu ÇALIŞTIRMAZ, sadece yazar). Scope: `playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read`. Redirect: `http://127.0.0.1:8888/callback` (localhost değil — Spotify loopback zorunlu).
-6. **Mimari:** Saf fonksiyonlar (genre.py / order.py / enrich.py) + Protocol arayüzlü client → mock'la %100 test edilebilir.
-7. **Git:** branch `loop/v1`, **PUSH YOK**. Sırlar repoya GİRMEZ (.env, .cache .gitignore'da).
-8. **Mod:** CERRAH — sadece güvenli inşa. Gerçek API çağrısı yok, gerçek sır yok, her şey mock üstünde yeşil.
+## 🔒 KİLİTLİ KARARLAR (değiştirme = Şef onayı)
+1. **Stack:**
+   - **Backend:** Python + Flask (`app.py`) + spotipy + requests. Çekirdek mantık saf modüllerde.
+   - **Frontend:** React + Vite + Tailwind, **koyu tema** (360SMM "Aydınlık Derinlik" hissi). `web/` klasörü.
+2. **DEMO modu (kritik):** `DEMO=1` ile backend, fixture playlist'ler döndürür → **auth OLMADAN** panel tam çalışır. Sabah Şef açar, demo veriyle tıklar, türe-ayır + geçişli-sıra çalışır görür. Gerçek veri auth'tan sonra.
+3. **BPM/key kaynağı:** **GetSongBPM** (Şef onayladı). Spotify Audio Features Kasım 2024 kapandı, kullanma. Sonuç `cache/bpm.json`'a cache. README'de attribution ZORUNLU.
+4. **Tür kaynağı:** Sanatçı `genres` → ana kovalara normalize. Boş → "Diğer".
+5. **GÜVENLİK (en kritik):**
+   - Her işlem **önce ÖNİZLE (preview)**, sonra ayrı **Uygula (apply)** — apply'da onay diyaloğu.
+   - Apply öncesi kaynak listeyi `backups/<isim>-<ts>.json`'a yedekle.
+   - Türe-ayırma orijinali ASLA silmez; hep YENİ playlist.
+   - Beğenilenler reorder edilmez; okunup yeni playlist'lere kopyalanır.
+6. **Auth:** `auth.py` tek seferlik OAuth (loop ÇALIŞTIRMAZ, yazar). Scope: `playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read`. Redirect `http://127.0.0.1:8888/callback` (localhost değil).
+7. **Mimari:** Çekirdek saf fonksiyonlar (genre/order/enrich) + Protocol client → mock'la %100 test. Flask sadece ince kabuk.
+8. **Git:** branch `loop/v1`, **PUSH YOK**. Sırlar repoya GİRMEZ.
+9. **Mod:** CERRAH — gerçek API/auth YOK, her şey mock + DEMO fixture üstünde; backend pytest yeşil, frontend `npm run build` başarılı.
 
-## 📐 FAZLAR (sırayla; her fazın "BİTTİ ŞARTI" var)
+## 📁 Yapı
+```
+spotify_organizer/
+  client.py    # SpotifyClientProtocol + spotipy impl
+  fixtures.py  # DEMO veri (sahte playlist/şarkı/sanatçı)
+  genre.py     # tür kovalama + normalize
+  enrich.py    # GetSongBPM + cache
+  order.py     # Camelot harmonic order
+  service.py   # split_genre / order_playlist → preview + apply
+  app.py       # Flask API (+ build edilmiş frontend'i serve)
+web/           # React + Vite + Tailwind (koyu tema)
+tests/         # mock_client + pytest
+auth.py
+```
 
-### F0 — İskelet  ✅ (Zenco Baba kurdu)
-requirements.txt · .gitignore · .env.example · README stub · .claude/* hazır.
-**BİTTİ:** dosyalar var, `git status` temiz başlangıç.
+## 📐 FAZLAR (her fazın BİTTİ ŞARTI var)
 
-### F1 — Client soyutlaması + mock + auth
-- `client.py`: `SpotifyClientProtocol` (methodlar: `current_user_playlists`, `playlist_items`, `liked_songs`, `artists`, `create_playlist`, `add_items`, `replace_items`). Gerçek impl spotipy sarar.
-- `tests/mock_client.py`: bellekte sahte Spotify (sabit fixture şarkılar + sanatçılar).
-- `auth.py`: spotipy SpotifyOAuth tek-seferlik akış.
-**BİTTİ:** mock client import edilir, protocol'e uyar; `pytest` F1 testleri yeşil.
+### F0 — İskelet ✅ (kuruldu)
+requirements/.gitignore/.env.example/README/.claude hazır. **BİTTİ.**
 
-### F2 — Tür kovalama (`genre.py`)
-- Mikro-tür → ana kova haritası (Pop / Rock / Rap-Hiphop / Elektronik / Türkçe / Arabesk / Jazz-Soul / Klasik / Diğer). Genişletilebilir dict.
-- `bucket_tracks(tracks, artist_genres) -> dict[bucket, list[track]]`. Boş tür → "Diğer".
-**BİTTİ:** karışık fixture doğru kovalara ayrılıyor; edge (boş tür, çok-türlü sanatçı) test edilmiş.
+### F1 — Çekirdek motor (saf Python)
+client Protocol + `tests/mock_client.py` + `fixtures.py` (DEMO) + `genre.py` (kovala/normalize) + `enrich.py` (GetSongBPM client + cache + mock) + `order.py` (Camelot çark + greedy harmonic sıra). GetSongBPM/spotipy formatını context7/WebFetch ile doğrula.
+**BİTTİ:** `pytest` yeşil — kovalama, enrich cache hit/miss, harmonic sıra (eksik-veri dahil) test edilmiş.
 
-### F3 — Zenginleştirme (`enrich.py`)
-- GetSongBPM client: `get_bpm_key(artist, title) -> {bpm, key, camelot}`. Cache (`cache/bpm.json`), rate-limit nazik (jitter), bulunamayan → None.
-- Spotify key/mode YOKsa GetSongBPM'in key'ini Camelot'a çevir.
-- Build sırasında GetSongBPM API formatını context7/WebFetch ile DOĞRULA (varsayım yapma).
-**BİTTİ:** mock GetSongBPM ile enrich testleri yeşil; cache hit/miss test edilmiş; eşleşmeyen şarkı sayısı loglanıyor.
+### F2 — Flask backend
+`service.py` (split_genre/order_playlist → preview+apply, backup) + `app.py` endpoint'leri:
+`GET /api/me`, `GET /api/playlists`, `GET /api/playlist/<id>`, `POST /api/split-genre/preview|apply`, `POST /api/order/preview|apply`. DEMO modu fixture döndürür. Gerçek modda spotipy.
+**BİTTİ:** backend testleri yeşil; DEMO=1 ile tüm endpoint'ler fixture cevabı veriyor; apply mock'ta doğru çağrı + backup yazıyor.
 
-### F4 — Geçişli sıralama (`order.py`)
-- Camelot çarkı haritası (key+mode → "8A/8B" vb.).
-- `harmonic_order(enriched_tracks) -> ordered list`: greedy nearest-neighbor; komşu maliyeti = key uyumsuzluğu (Camelot ±1/relative ucuz) + |ΔBPM| normalize. BPM kademeli ramp. BPM/key'i olmayanlar sona, kendi arasında stabil.
-**BİTTİ:** bilinen küçük sette beklenen sıra; tüm-veri-eksik durumda çökmez; testler yeşil.
+### F3 — Frontend (React panel, koyu tema)
+Vite+Tailwind kur. Sol: playlist listesi. Sağ: seçili playlist şarkıları + "Türe Göre Ayır" / "Geçişli Sırala" butonları. Önizleme paneli (kovalar / yeni sıra) → "Uygula" onay diyaloğu. Loading/empty/error state'leri. `/api`'ye bağlan.
+**BİTTİ:** `npm run build` başarılı; DEMO backend'le panel uçtan uca çalışıyor (önizle→uygula akışı demo veride görünür).
 
-### F5 — Servis + CLI (`organize.py`, `cli.py`)
-- `split_genre(source) -> plan/apply`: oku → kovala → her kova için yeni playlist + ekle (batch 100).
-- `order_playlist(pid) -> plan/apply`: oku → enrich → harmonic_order → replace_items (batch 100).
-- `cli.py`: `list`, `split-genre <kaynak|liked>`, `order <playlist>`; `--dry-run` (vars.), `--apply`, `--backup` (apply'da otomatik).
-- dry-run: ne yapılacağını okunur tabloyla yazdır, hiçbir şeye dokunma.
-**BİTTİ:** CLI mock client ile uçtan uca çalışır; dry-run hiçbir mutasyon yapmaz; apply mock'ta doğru çağrıları yapar.
+### F4 — Güvenlik + apply cilası
+Apply onay diyaloğu, backup, "geri dönüşü zor" uyarısı; dry-run/preview varsayılan akış; hata mesajları kullanıcı-dostu.
+**BİTTİ:** apply'sız hiçbir mutasyon olmaz; onaysız apply yok; backup test edilmiş.
+
+### F5 — Doğrulama
+Backend pytest tam yeşil + frontend build temiz + DEMO uçtan uca. (Opsiyonel: panel screenshot recipe ile görsel kontrol.)
+**BİTTİ:** her şey yeşil + DEMO panel açılıp çalışıyor.
 
 ### F6 — Cila
-README (kurulum + GetSongBPM attribution + örnekler) · MORNING.md güncel · `learned-errors.jsonl` doldu · tüm testler yeşil.
-**BİTTİ:** `pytest` tamamen yeşil; README bir yabancının kurabileceği kadar net.
+README (kurulum + GetSongBPM attribution + ekran akışı) + MORNING güncel + learned-errors dolu.
+**BİTTİ:** yabancı kurabilir netlikte; testler yeşil.
 
 ## 🧊 BACKLOG (Şef gerekli / loop YAPMAZ)
-- Gerçek OAuth (`python auth.py`) — tarayıcı onayı, sadece Şef.
-- GetSongBPM gerçek API key — Şef alır.
-- "Mood/enerji" boyutu — GetSongBPM yeterli alan vermezse Backlog.
-- Dev-mode 25-kişi sınırını aşma (quota extension) — sadece dağıtım gerekirse.
-- Beğenilenler reorder (API saved-tracks sırasını değiştirmez) — gerekirse "Beğenilenler kopyası" playlist'i.
+- Gerçek OAuth (`python auth.py`) — tarayıcı, sadece Şef.
+- GetSongBPM gerçek key — Şef alır.
+- Deploy (şimdilik lokal çalışır).
+- Mood/enerji boyutu (GetSongBPM yetmezse).
+- Dev-mode 25-kişi sınırını aşma.
 
-## ✅ TANIM: "Loop bitti"
-F1–F6 BİTTİ şartları sağlandı, `pytest` yeşil, çalışma ağacı tutarlı, MORNING.md güncel. Gerçek-auth gerektiren her şey Backlog'da ve MORNING.md'de.
+## ✅ "Loop bitti"
+F1–F6 BİTTİ; backend pytest yeşil; frontend build temiz; DEMO panel uçtan uca çalışıyor; MORNING güncel; gerçek-auth gerektiren her şey Backlog'da.

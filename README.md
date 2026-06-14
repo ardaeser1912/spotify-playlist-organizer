@@ -1,20 +1,22 @@
 # Spotify Playlist Organizer
 
-Karışık playlist'leri / Beğenilenler'i düzenleyen lokal araç:
+Karışık playlist'leri / Beğenilenler'i düzenleyen **görsel web paneli** (koyu tema):
 
 - **Türe göre ayır** — karışık liste → türe göre yeni playlist'ler (orijinal korunur).
 - **Geçişli sırala** — harmonic mixing (Camelot çarkı) + BPM rampasıyla DJ mantığında sıralama.
 
+Backend: Flask + spotipy. Frontend: React + Vite + Tailwind.
+
 > Kurulum ve ilk çalıştırma için `.claude/MORNING.md`.
 
 ## Güvenlik
-Her komut varsayılan **dry-run**. Gerçek değişiklik sadece `--apply` ile ve önce otomatik yedek alınır. Türe-ayırma orijinal listeye asla dokunmaz.
+Her işlem önce **Önizle**, sonra onaylı **Uygula** — apply öncesi otomatik yedek alınır. Türe-ayırma orijinal listeye asla dokunmaz.
 
-## Kullanım
+## Çalıştırma
 ```
-python -m spotify_organizer.cli list
-python -m spotify_organizer.cli split-genre liked --dry-run
-python -m spotify_organizer.cli order "Playlist Adı" --dry-run
+# Demo (auth gerekmez):
+DEMO=1 python -m spotify_organizer.app
+cd web && npm install && npm run dev
 ```
 
 ## Veri kaynakları / atıf

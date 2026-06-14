@@ -5,13 +5,15 @@
 1. Türe göre yeni playlist'lere ayırma. 2. Geçişli (harmonic mixing) sıralama.
 
 ## Tech stack
-Python 3 · spotipy · requests · python-dotenv · pytest.
+**WEB APP.** Backend: Python 3 · Flask · spotipy · requests · python-dotenv · pytest. Frontend: React + Vite + Tailwind (koyu tema, 360SMM hissi, `web/`).
 
 ## Mimari kararlar
+- Görsel panel: sol playlist listesi · sağ şarkılar + "Türe Ayır"/"Geçişli Sırala" · Önizle→Uygula.
+- DEMO modu (`DEMO=1`): fixture veriyle panel auth olmadan tam çalışır.
 - BPM/key kaynağı = GetSongBPM (Spotify Audio Features Kasım 2024'te kapandı).
 - Tür = sanatçı genres → ana kovalara normalize.
-- Saf fonksiyonlar + Protocol client → mock'la tam test.
-- Güvenlik: varsayılan dry-run; mutasyon `--apply` + otomatik yedek; orijinal liste korunur.
+- Çekirdek saf fonksiyonlar + Protocol client → mock'la tam test; Flask ince kabuk.
+- Güvenlik: önce Önizle, sonra onaylı Uygula + otomatik yedek; orijinal liste korunur.
 
 ## Bilinen kısıtlar / tuzaklar
 - Dev-mode: sadece Şef + eklediği 25 kişi authorize olabilir (kişisel kullanımda sorun değil).

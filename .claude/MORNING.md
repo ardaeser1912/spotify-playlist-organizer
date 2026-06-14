@@ -1,40 +1,41 @@
-# MORNING — Şef'in Elle Yapacakları ☕️
+# MORNING — Şef'in Sabah Adımları ☕️
 
-Loop kodu yazdı ve mock'la test etti. Gerçek hesapta çalıştırmak için (tek seferlik):
+Loop, **görsel web panelini** yazıp DEMO veriyle test etti. İki aşama var:
 
-## 1) Spotify Developer App (~3 dk)
-1. https://developer.spotify.com/dashboard → **Create app**
-2. Redirect URI: `http://127.0.0.1:8888/callback` (aynen — localhost DEĞİL)
-3. **Client ID** + **Client Secret**'i kopyala.
+## A) HEMEN — paneli demo veriyle aç (auth GEREKMEZ, 1 dk)
+```
+cd ~/spotify-playlist-organizer
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+DEMO=1 python -m spotify_organizer.app        # backend (demo modu)
+# yeni terminal:
+cd web && npm install && npm run dev           # panel açılır
+```
+→ Tarayıcıda demo playlist'lerle "Türe Ayır" / "Geçişli Sırala" → Önizle → Uygula akışını görürsün. Hiçbir gerçek şeye dokunmaz.
 
-## 2) GetSongBPM key (~1 dk)
-1. https://getsongbpm.com/api → ücretsiz key al.
-2. Lisans şartı: README'deki attribution linki kalsın.
-
-## 3) Sırları yapıştır
-`.env.example`'ı `.env` yap, doldur:
+## B) GERÇEK hesabına bağla (tek seferlik, ~5 dk)
+### 1) Spotify Developer App
+https://developer.spotify.com/dashboard → **Create app** → Redirect URI: `http://127.0.0.1:8888/callback` (localhost DEĞİL) → **Client ID** + **Secret** kopyala.
+### 2) GetSongBPM key
+https://getsongbpm.com/api → ücretsiz key (README'deki attribution linki kalsın).
+### 3) `.env` doldur
+`.env.example` → `.env`:
 ```
 SPOTIPY_CLIENT_ID=...
 SPOTIPY_CLIENT_SECRET=...
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 GETSONGBPM_API_KEY=...
 ```
-
-## 4) Tek seferlik giriş
+### 4) Tek seferlik giriş
 ```
-cd ~/spotify-playlist-organizer
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python auth.py          # tarayıcı açılır, onayla → token .cache'e yazılır
+python auth.py        # tarayıcı açılır, onayla → token .cache'e yazılır
 ```
-
-## 5) İlk güvenli deneme (hiçbir şeye dokunmaz)
+### 5) Paneli gerçek modda aç
 ```
-python -m spotify_organizer.cli list
-python -m spotify_organizer.cli split-genre liked --dry-run
-python -m spotify_organizer.cli order "<playlist adı>" --dry-run
+python -m spotify_organizer.app      # DEMO=1 olmadan → gerçek playlist'lerin
+cd web && npm run dev
 ```
-Çıktı iyi görünürse `--apply` ekle (otomatik yedek alır).
+İlk denemede **Önizle** ile bak, iyiyse **Uygula** (otomatik yedek alır).
 
 ---
 ## 🟡 Şef kararı bekleyenler (loop buraya yazar)
