@@ -1,0 +1,15 @@
+# Sırlar — ASLA commit etme
+.env
+.cache
+.spotify_cache
+*.cache
+
+# Yerel veri
+backups/
+cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
