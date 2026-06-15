@@ -97,3 +97,9 @@ Geriye Şef'e bağlı: GetSongBPM key (DJ/BPM için) · GitHub push.
 - **Tür kova önceliği:** Arabesk > Hip-Hop > Elektronik > R&B > Rock > Pop (ilk eşleşen kazanır). DEMO'da doğru görünüyor; gerçek kütüphanende tuhaf bir eşleme olursa `genre.py` tablosuna kova/anahtar ekleriz.
 - **Beğenilenler'i gerçekten silme/azaltma** istemiyoruz: dedupe/sort/order Beğenilenler'de hep KOPYA üretir (kilitli karar #6). Normal playlist'lerde `replace` ile yerinde günceller (önce yedek). Bu davranışı onaylıyor musun?
 - (Backlog — loop YAPMADI: gerçek deploy, mood/enerji boyutu, dev-mode 25-kişi aşımı.)
+
+## 🎨 PROFESYONEL ÖZELLİKLER (15 Haz, Şef "efsane/tam profesyonel" istedi) — 275 test
+- **🖼️ ALBÜM KAPAKLARI:** her parça satırında kapak (gerçek modda Spotify album.images — ek API maliyeti YOK; DEMO'da 16 gerçek iTunes kapağı fixtures'ta). `AlbumArt.jsx` (img+şık fallback) → PlaylistsView/PreviewModal/ToolsView. Görsel doğrulandı.
+- **🎚️ DJ GEÇİŞ GÖRSELLEŞTİRMESİ:** Geçişli Sırala/Akıllı Mix önizlemesinde ardışık parçalar arası "⟶ uyumlu" (Camelot harmonic, --teal) + "Δ BPM". `api.camelotCompatible`. Profesyonel DJ aracı görünümü. Görsel doğrulandı (DEMO).
+- **⚠️ GERÇEK HESAPTA DJ GEÇİŞ = GetSongBPM KEY ŞART:** fixtures bpm/camelot dolu (DEMO'da geçişler görünür) ama GERÇEK Spotify bpm vermiyor → key olmadan gerçek hesapta bpm=None → geçiş göstergesi çıkmaz (sadece sıra). **GetSongBPM ücretsiz key = gerçek hesapta DJ/transition/tempo açar.** `.env` GETSONGBPM_API_KEY boş.
+- Commit'ler `6f80fad`/`440c275`. Gerçek hesap testi rate-limit bitince (DEMO QA temiz).
