@@ -27,7 +27,7 @@ def main():
         cache_path=".spotify_cache", open_browser=False))
     c = SpotipyClient(sp)
     names = {t["artist"] for t in c.liked_tracks() if t.get("artist")}
-    print(f"{len(names)} benzersiz sanatçı — iTunes'tan tür çekiliyor (nazik tempo)...", flush=True)
+    print(f"{len(names)} benzersiz sanatçı — MusicBrainz'den tür çekiliyor (nazik tempo)...", flush=True)
     os.makedirs("cache", exist_ok=True)
     cache = genre_source.load_cache(CACHE)
     done = 0
