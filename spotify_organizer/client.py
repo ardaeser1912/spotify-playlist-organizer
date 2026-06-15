@@ -94,7 +94,13 @@ class SpotipyClient:
 
     def playlists(self) -> list[dict]:
         # Gerçek API None öğe / eksik 'tracks' / eksik 'name' döndürebilir (editöryel listeler) → savunmacı oku.
-        out = []
+        # Beğenilenler ("Liked Songs") gerçek bir /me/playlists öğesi DEĞİL → sözde-liste olarak başa ekle.
+        # Kullanıcının ana verisi budur; UI bunsuz boş görünüyordu.
+        try:
+            liked_total = (self.sp.current_user_saved_tracks(limit=1) or {}).get("total")
+        except Exception:  # noqa: BLE001 — sayım alınamazsa None (panel yine ayakta)
+            liked_total = None
+        out = [{"id": "liked", "name": "Beğenilenler", "track_count": liked_total}]
         for p in self._paginate(self.sp.current_user_playlists(limit=_PAGE)):
             if not p or not p.get("id"):
                 continue
@@ -105,6 +111,9 @@ class SpotipyClient:
         return out
 
     def playlist_tracks(self, playlist_id: str) -> list[dict]:
+        # "liked"/"p_liked" Spotify'da gerçek playlist değil → saved tracks ile karşıla.
+        if playlist_id in ("liked", "p_liked"):
+            return self.liked_tracks()
         items = self._paginate(self.sp.playlist_items(playlist_id, limit=100,
                                                        additional_types=("track",)))
         out = [_normalize_track(it.get("track")) for it in items]

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { post, fmtDuration, camelotColor } from '../lib/api'
+import { api, post, fmtDuration, camelotColor } from '../lib/api'
 
 /**
  * Paylaşılan Önizle → Uygula akışı (güvenlik çekirdeği).
@@ -21,6 +21,7 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   const [applying, setApplying] = useState(false)
   const [done, setDone] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [isDemo, setIsDemo] = useState(true) // güvenli varsayım: DEMO (Uygula birincil)
 
   const dialogRef = useRef(null)
   const titleId = useRef('preview-modal-title-' + Math.random().toString(36).slice(2)).current
@@ -34,6 +35,15 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [open, previewPath, JSON.stringify(body)])
+
+  // Mod bayrağı: gerçek hesapta Spotify yazmayı engeller → export birincil olmalı.
+  // Hata olursa DEMO varsay (güvenli: Uygula birincil kalır).
+  useEffect(() => {
+    if (!open) return
+    api('/api/me')
+      .then((r) => setIsDemo(r?.data?.demo !== false))
+      .catch(() => setIsDemo(true))
+  }, [open])
 
   // Erişilebilirlik: Escape ile kapat + basit focus-trap (Tab/Shift+Tab sarması)
   useEffect(() => {
@@ -202,34 +212,47 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
               <span className="text-[var(--amber)]">⬡</span>
               Uygulama geri dönüşü zordur — ama her şey önce otomatik yedeklenir, Yedekler’den geri alabilirsin.
             </p>
+            {/* Buton hiyerarşisi moda göre: gerçek hesapta Spotify yazmayı
+                engellediği için Dışa Aktar birincil, Uygula ikincil + ipucu. */}
             <div className="flex justify-end gap-3 flex-wrap">
               <button className="btn btn-ghost" onClick={onClose}>İptal</button>
-              <button className={`btn btn-ghost ${isForbidden ? 'btn-primary' : ''}`}
-                      onClick={exportCsv} disabled={!canExport}>
-                ⬇ Dışa Aktar (CSV)
-              </button>
-              <button className={`btn btn-ghost ${isForbidden ? 'btn-primary' : ''}`}
-                      onClick={copyLinks} disabled={!canExport}>
-                {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
-              </button>
-              {!isForbidden && (
+              {!isForbidden && (isDemo ? (
                 <button className="btn btn-primary" onClick={apply}
                         disabled={loading || applying || !!error || nothingToApply}>
                   {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
                 </button>
-              )}
+              ) : (
+                <div className="flex flex-col items-end gap-1">
+                  <button className="btn btn-ghost" onClick={apply}
+                          disabled={loading || applying || !!error || nothingToApply}>
+                    {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
+                  </button>
+                  <span className="text-[0.66rem] text-[var(--faint)] text-right max-w-[16rem]">
+                    Spotify geliştirici-modunda yazmayı engelliyor — sonucu Dışa Aktar.
+                  </span>
+                </div>
+              ))}
+              <button className={`btn btn-ghost ${isForbidden ? 'btn-primary' : ''}`}
+                      onClick={copyLinks} disabled={!canExport}>
+                {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
+              </button>
+              <button className={`btn ${(isForbidden || !isDemo) ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={exportCsv} disabled={!canExport}>
+                ⬇ Dışa Aktar (CSV)
+              </button>
             </div>
           </div>
         )}
         {done && (
           <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end gap-3 flex-wrap">
-            <button className="btn btn-ghost" onClick={exportCsv} disabled={!canExport}>
-              ⬇ Dışa Aktar (CSV)
-            </button>
             <button className="btn btn-ghost" onClick={copyLinks} disabled={!canExport}>
               {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
             </button>
-            <button className="btn btn-primary" onClick={onClose}>Bitti</button>
+            <button className={`btn ${isDemo ? 'btn-ghost' : 'btn-primary'}`}
+                    onClick={exportCsv} disabled={!canExport}>
+              ⬇ Dışa Aktar (CSV)
+            </button>
+            <button className={`btn ${isDemo ? 'btn-primary' : 'btn-ghost'}`} onClick={onClose}>Bitti</button>
           </div>
         )}
       </div>

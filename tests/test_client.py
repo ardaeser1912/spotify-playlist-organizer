@@ -7,6 +7,8 @@ batch'lemesi doğrulanabilsin.
 """
 from spotify_organizer.client import SpotipyClient, _normalize_track
 
+_MISSING = object()  # "saved_total verilmedi" işareti → cevap 'total' içermez
+
 
 # --- spotipy-şekilli yardımcılar ---------------------------------------------
 
@@ -43,6 +45,9 @@ class FakeSpotify:
         # Önceden ayarlanmış cevaplar
         self._user = responses.get("user", {"id": "u1", "display_name": "Şef"})
         self._pages = responses.get("pages", {})          # method adı -> [page, page, ...]
+        # Beğenilenler toplamı: playlists() bunu current_user_saved_tracks(limit=1).total'dan okur.
+        # _MISSING = anahtar verilmedi → cevap 'total' içermesin (savunmacı None yolu).
+        self._saved_total = responses.get("saved_total", _MISSING)
         self._artists_pages = responses.get("artists", [])  # her artists() çağrısı için sıralı cevap
         self._top_tracks = responses.get("top_tracks", {"items": []})
         self._top_artists = responses.get("top_artists", {"items": []})
@@ -83,7 +88,12 @@ class FakeSpotify:
 
     def current_user_saved_tracks(self, limit=50):
         self._record("current_user_saved_tracks", limit=limit)
-        return self._first_page("current_user_saved_tracks")
+        page = self._first_page("current_user_saved_tracks")
+        if self._saved_total is not _MISSING:
+            # total alanını ilk sayfaya yaz (playlists() limit=1 ile bunu okur).
+            # next() kimlik karşılaştırması bozulmasın diye orijinal nesneyi mutasyona uğrat.
+            page["total"] = self._saved_total
+        return page
 
     def next(self, page):
         """spotipy.next(page) — kayıtlı sayfa zincirinde bir sonrakini döndürür."""
@@ -221,7 +231,8 @@ def test_paginate_collects_second_page():
     fake = FakeSpotify(pages={"current_user_playlists": [p1, p2]})
     client = SpotipyClient(fake)
     res = client.playlists()
-    assert [p["id"] for p in res] == ["pl1", "pl2"]
+    # Beğenilenler sözde-listesi başta, ardından gerçek listeler.
+    assert [p["id"] for p in res] == ["liked", "pl1", "pl2"]
     # next() ilk sayfa için (next dolu) tam 1 kez çağrılmalı
     assert len(fake.next_calls) == 1
     assert fake.next_calls[0] is p1
@@ -244,9 +255,10 @@ def test_playlists_maps_track_count():
         {"id": "pl1", "name": "Sabah", "tracks": {"total": 12}},
         {"id": "pl2", "name": "Akşam", "tracks": {"total": 0}},
     ])
-    fake = FakeSpotify(pages={"current_user_playlists": [p1]})
+    fake = FakeSpotify(pages={"current_user_playlists": [p1]}, saved_total=979)
     res = SpotipyClient(fake).playlists()
     assert res == [
+        {"id": "liked", "name": "Beğenilenler", "track_count": 979},
         {"id": "pl1", "name": "Sabah", "track_count": 12},
         {"id": "pl2", "name": "Akşam", "track_count": 0},
     ]
@@ -265,10 +277,31 @@ def test_playlists_real_world_quirks():
     fake = FakeSpotify(pages={"current_user_playlists": [p1]})
     res = SpotipyClient(fake).playlists()
     assert res == [
+        # saved_total verilmedi → savunmacı None
+        {"id": "liked", "name": "Beğenilenler", "track_count": None},
         {"id": "pl1", "name": "Takip Edilen", "track_count": None},
         {"id": "pl2", "name": "Eksik Tracks", "track_count": None},
         {"id": "pl3", "name": "(isimsiz)", "track_count": 7},
     ]
+
+
+def test_playlists_liked_pseudo_first_with_total():
+    # Beğenilenler her zaman ilk öğe; track_count = saved tracks toplamı.
+    p1 = _page([{"id": "pl1", "name": "Sabah", "tracks": {"total": 3}}])
+    fake = FakeSpotify(pages={"current_user_playlists": [p1]}, saved_total=979)
+    res = SpotipyClient(fake).playlists()
+    assert res[0] == {"id": "liked", "name": "Beğenilenler", "track_count": 979}
+    # toplam yalnızca limit=1 ile (sayfalama değil) sorgulanmalı
+    call = next(c for c in fake.calls if c[0] == "current_user_saved_tracks")
+    assert call[2]["limit"] == 1
+
+
+def test_playlists_liked_total_none_when_missing():
+    # saved tracks 'total' içermezse savunmacı None (UI '—' gösterir).
+    p1 = _page([{"id": "pl1", "name": "Sabah", "tracks": {"total": 3}}])
+    fake = FakeSpotify(pages={"current_user_playlists": [p1]})  # saved_total verilmedi
+    res = SpotipyClient(fake).playlists()
+    assert res[0] == {"id": "liked", "name": "Beğenilenler", "track_count": None}
 
 
 # =============================================================================
@@ -282,7 +315,7 @@ def test_playlist_tracks_skips_episode_and_none():
         {"track": None},                               # atlanır
     ])
     fake = FakeSpotify(pages={"playlist_items": [p1]})
-    res = SpotipyClient(fake).playlist_tracks("p_liked")
+    res = SpotipyClient(fake).playlist_tracks("pReal")
     assert [t["id"] for t in res] == ["t1"]
 
 
@@ -314,6 +347,26 @@ def test_liked_tracks_normalizes():
 def test_liked_tracks_empty():
     fake = FakeSpotify(pages={"current_user_saved_tracks": [_page([])]})
     assert SpotipyClient(fake).liked_tracks() == []
+
+
+def test_playlist_tracks_liked_id_returns_liked_tracks():
+    # "liked" gerçek playlist değil → saved tracks normalize edilip döner.
+    p1 = _page([{"track": _sp_track("t1", name="A")},
+                {"track": _sp_track("t2", name="B")}])
+    fake = FakeSpotify(pages={"current_user_saved_tracks": [p1]})
+    res = SpotipyClient(fake).playlist_tracks("liked")
+    assert [t["title"] for t in res] == ["A", "B"]
+    # playlist_items'a hiç gidilmemeli
+    assert _called(fake, "playlist_items") == 0
+
+
+def test_playlist_tracks_p_liked_id_returns_liked_tracks():
+    # DEMO/legacy "p_liked" id'si de aynı saved tracks yoluna düşer.
+    p1 = _page([{"track": _sp_track("t1", name="A")}])
+    fake = FakeSpotify(pages={"current_user_saved_tracks": [p1]})
+    res = SpotipyClient(fake).playlist_tracks("p_liked")
+    assert [t["title"] for t in res] == ["A"]
+    assert _called(fake, "playlist_items") == 0
 
 
 # =============================================================================
