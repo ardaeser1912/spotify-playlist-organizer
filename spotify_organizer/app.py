@@ -30,11 +30,18 @@ def _service() -> OrganizerService:
     from spotipy.oauth2 import SpotifyOAuth
     from .client import REDIRECT_URI, SCOPES, SpotipyClient
     from .enrich import build_getsongbpm_fetch
+    # retries/status_retries=0: 429 (rate limit) gelince spotipy SAATLERCE retry-sleep
+    # yapıp backend'i KİLİTLEMESİN → hızlı başarısız ol, UI net mesaj göstersin.
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
         scope=SCOPES, redirect_uri=os.environ.get("SPOTIPY_REDIRECT_URI", REDIRECT_URI),
-        cache_path=".spotify_cache", open_browser=False))
+        cache_path=".spotify_cache", open_browser=False),
+        retries=0, status_retries=0, requests_timeout=20)
+    from .cache_layer import CachingClient
     fetch = build_getsongbpm_fetch(os.environ.get("GETSONGBPM_API_KEY", ""))
-    return OrganizerService(SpotipyClient(sp), bpm_fetch=fetch, genre_provider=_genre_provider)
+    # CachingClient: 979 Beğenilenler'i bir kez çekip diske cache'ler → tekrarlı işlemler
+    # anında gelir + Spotify rate-limit'ini bir daha tetiklemez.
+    client = CachingClient(SpotipyClient(sp))
+    return OrganizerService(client, bpm_fetch=fetch, genre_provider=_genre_provider)
 
 
 _GENRE_CACHE = "cache/genres.json"
@@ -72,6 +79,11 @@ def _run(fn):
     try:
         return _ok(fn(svc, body))
     except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        low = msg.lower()
+        if "429" in msg or "rate" in low or "request limit" in low:
+            return _err("Spotify geçici olarak istek limiti koydu (geliştirici-modu düşük kota). "
+                        "Birkaç saat sonra tekrar dene — DEMO modu çalışmaya devam eder.", 429)
         return _err(e, 400)
 
 
@@ -210,9 +222,21 @@ def restore():
     return _run(lambda s, b: s.restore(b.get("file", "")))
 
 
+@app.post("/api/refresh")
+def refresh():
+    """Önbelleği temizle — kullanıcı Spotify'da şarkı ekleyince taze veri çekilsin."""
+    def fn(s, b):
+        if hasattr(s.client, "clear"):
+            s.client.clear()
+        return {"refreshed": True}
+    return _run(fn)
+
+
 def main():
     port = int(os.environ.get("PORT", "5055"))
-    app.run(host="127.0.0.1", port=port, debug=True, use_reloader=False)
+    # threaded=True: 979-parça gibi yavaş istekler işlenirken panel diğer isteklere
+    # (örn /api/me) yanıt vermeye devam etsin (tek-thread blok → "backend düştü" hissini önler).
+    app.run(host="127.0.0.1", port=port, debug=True, use_reloader=False, threaded=True)
 
 
 if __name__ == "__main__":

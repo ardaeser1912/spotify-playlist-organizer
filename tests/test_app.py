@@ -92,3 +92,33 @@ def test_apply_yedek_yazar_ve_listelenir(client, monkeypatch, tmp_path):
     assert res["created"]
     bks = _data(client.get("/api/backups"))
     assert bks and bks[0]["count"] == 17
+
+
+def test_rate_limit_dostça_mesaj(monkeypatch):
+    # 429/rate-limit gelince ham hata değil net Türkçe mesaj + 429 kodu.
+    monkeypatch.setenv("DEMO", "1")
+    import spotify_organizer.app as appmod
+
+    class Boom:
+        client = object()
+        def insights(self, source):
+            raise Exception("http status: 429 - Your application has reached a rate/request limit")
+
+    monkeypatch.setattr(appmod, "_service", lambda: Boom())
+    r = appmod.app.test_client().get("/api/insights/liked")
+    j = r.get_json()
+    assert j["success"] is False and r.status_code == 429
+    assert "limit" in j["error"].lower()
+
+
+def test_gercek_mod_cachingclient_sarmalar(monkeypatch):
+    # Regresyon: gerçek modda istemci CachingClient ile sarılmalı (rate-limit koruması).
+    monkeypatch.delenv("DEMO", raising=False)
+    import spotipy
+    from spotipy import oauth2
+    monkeypatch.setattr(oauth2, "SpotifyOAuth", lambda **k: object())
+    monkeypatch.setattr(spotipy, "Spotify", lambda **k: object())
+    import spotify_organizer.app as appmod
+    from spotify_organizer.cache_layer import CachingClient
+    svc = appmod._service()
+    assert isinstance(svc.client, CachingClient)
