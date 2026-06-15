@@ -43,6 +43,53 @@ def test_bucket_arabesk_oncelik():
     assert genre_source.itunes_to_bucket("Arabesk-Pop") == "Arabesk"
 
 
+# --- İnce elektronik kovaları: gerçek cache ham verisi örnekleri ---
+
+def test_bucket_hard_techno_oncelik():
+    # "hard techno" + "hardstyle" var → Hard Tekno (Tekno'dan önce kazanır)
+    assert genre_source.itunes_to_bucket(
+        "electronic edm big room house hard techno hardstyle"
+    ) == "Hard Tekno"
+
+
+def test_bucket_techno():
+    assert genre_source.itunes_to_bucket("techno") == "Tekno"
+
+
+def test_bucket_house_oncelik():
+    # garage + house var, edm de var → House (Elektronik'ten önce kazanır)
+    assert genre_source.itunes_to_bucket("dance house dj garage edm") == "House"
+
+
+def test_bucket_hiphop_genel():
+    # rap var → Hip-Hop (House'tan önce kazanır)
+    assert genre_source.itunes_to_bucket("pop rap jazz dance house") == "Hip-Hop"
+
+
+def test_bucket_trap():
+    assert genre_source.itunes_to_bucket("trap drill") == "Trap"
+
+
+def test_bucket_dance_elektronik_genel():
+    assert genre_source.itunes_to_bucket("Dance") == "Elektronik"
+
+
+def test_bucket_rnb_birlesik():
+    assert genre_source.itunes_to_bucket("r&b rnb soul") == "R&B"
+
+
+def test_bucket_rock_metal():
+    assert genre_source.itunes_to_bucket("rock metal") == "Rock"
+
+
+def test_bucket_pop_synth():
+    assert genre_source.itunes_to_bucket("pop synth-pop") == "Pop"
+
+
+def test_bucket_jazz_diger_genel():
+    assert genre_source.itunes_to_bucket("Jazz") == "Diğer"
+
+
 # --- fetch_itunes_genre: sahte http_get ---
 
 class _FakeResp:

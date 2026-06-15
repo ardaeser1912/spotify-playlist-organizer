@@ -20,6 +20,7 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   const [data, setData] = useState(null)
   const [applying, setApplying] = useState(false)
   const [done, setDone] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const dialogRef = useRef(null)
   const titleId = useRef('preview-modal-title-' + Math.random().toString(36).slice(2)).current
@@ -82,6 +83,8 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   if (!open) return null
 
   const nothingToApply = kind === 'dedupe' && data && data.removed_count === 0
+  const isForbidden = !!error && /403|forbidden/i.test(error)
+  const canExport = !!data
 
   async function apply() {
     setApplying(true); setError(null)
@@ -93,6 +96,68 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
       setError(e.message)
     } finally {
       setApplying(false)
+    }
+  }
+
+  // Önizleme verisini düz satırlara çevirir: { group, title, artist, uri }
+  function exportRows() {
+    const rows = []
+    if (kind === 'groups') {
+      for (const g of data.groups || []) {
+        const grp = g.bucket || g.label || ''
+        for (const t of g.tracks || []) rows.push({ group: grp, ...t })
+      }
+    } else if (kind === 'dedupe') {
+      for (const t of data.kept || []) rows.push({ group: '', ...t })
+    } else {
+      ;(data.tracks || []).forEach((t, i) => rows.push({ group: String(i + 1), ...t }))
+    }
+    return rows
+  }
+
+  function trackLink(uri) {
+    if (!uri) return ''
+    const id = String(uri).split(':').pop()
+    return id ? `https://open.spotify.com/track/${id}` : ''
+  }
+
+  function csvCell(v) {
+    const s = v == null ? '' : String(v)
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+
+  function exportCsv() {
+    if (!data) return
+    const rows = exportRows()
+    const head = ['Grup', 'Başlık', 'Sanatçı', 'Spotify Linki']
+    const lines = [head.map(csvCell).join(',')]
+    for (const r of rows) {
+      lines.push([r.group, r.title, r.artist, trackLink(r.uri)].map(csvCell).join(','))
+    }
+    const csv = '﻿' + lines.join('\r\n')
+    const safeTitle = (title || 'liste')
+      .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'liste'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeTitle}-${Date.now()}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  async function copyLinks() {
+    if (!data) return
+    const links = exportRows().map((r) => trackLink(r.uri)).filter(Boolean).join('\n')
+    try {
+      await navigator.clipboard.writeText(links)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError('Panoya kopyalanamadı — tarayıcı izin vermedi.')
     }
   }
 
@@ -116,7 +181,16 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
         {/* gövde */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading && <p className="text-sm text-[var(--dim)]">Önizleme hazırlanıyor…</p>}
-          {error && <p className="text-sm text-red-300/85">⚠ {error}</p>}
+          {error && (isForbidden
+            ? (
+              <div className="surface px-4 py-3 text-sm text-[var(--dim)]">
+                <span className="text-[var(--amber)]">⬡</span>{' '}
+                Spotify, geliştirici-modu uygulamaların playlist <b>oluşturmasına</b> izin vermiyor.
+                Sonucu “⬇ Dışa Aktar” ile indir, ücretsiz bir içe-aktarma aracıyla (ya da elle) Spotify’a koy.
+              </div>
+            )
+            : <p className="text-sm text-red-300/85">⚠ {error}</p>
+          )}
           {done && <AppliedSummary data={done} />}
           {!loading && !error && !done && data && <Preview kind={kind} data={data} />}
         </div>
@@ -128,17 +202,33 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
               <span className="text-[var(--amber)]">⬡</span>
               Uygulama geri dönüşü zordur — ama her şey önce otomatik yedeklenir, Yedekler’den geri alabilirsin.
             </p>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 flex-wrap">
               <button className="btn btn-ghost" onClick={onClose}>İptal</button>
-              <button className="btn btn-primary" onClick={apply}
-                      disabled={loading || applying || !!error || nothingToApply}>
-                {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
+              <button className={`btn btn-ghost ${isForbidden ? 'btn-primary' : ''}`}
+                      onClick={exportCsv} disabled={!canExport}>
+                ⬇ Dışa Aktar (CSV)
               </button>
+              <button className={`btn btn-ghost ${isForbidden ? 'btn-primary' : ''}`}
+                      onClick={copyLinks} disabled={!canExport}>
+                {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
+              </button>
+              {!isForbidden && (
+                <button className="btn btn-primary" onClick={apply}
+                        disabled={loading || applying || !!error || nothingToApply}>
+                  {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
+                </button>
+              )}
             </div>
           </div>
         )}
         {done && (
-          <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end">
+          <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end gap-3 flex-wrap">
+            <button className="btn btn-ghost" onClick={exportCsv} disabled={!canExport}>
+              ⬇ Dışa Aktar (CSV)
+            </button>
+            <button className="btn btn-ghost" onClick={copyLinks} disabled={!canExport}>
+              {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
+            </button>
             <button className="btn btn-primary" onClick={onClose}>Bitti</button>
           </div>
         )}

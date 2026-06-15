@@ -21,8 +21,14 @@ OTHER = "Diğer"
 # kendine özgü adlar kullanır → kova eşlemesi onları da kapsar.
 _BUCKETS = [
     ("Arabesk", ("arabesk",)),
-    ("Hip-Hop", ("hip-hop", "hip hop", "rap")),
-    ("Elektronik", ("dance", "electronic", "house", "techno", "edm", "trance")),
+    ("Hard Tekno", ("hard techno", "hardstyle", "hardcore", "gabber")),
+    ("Tekno", ("techno",)),
+    ("Trap", ("trap", "drill", "phonk")),
+    ("Hip-Hop", ("hip hop", "hip-hop", "rap")),
+    ("House", ("house", "big room", "garage", "disco")),
+    ("Drum & Bass", ("drum and bass", "dnb", "dubstep", "breakbeat", "jungle")),
+    ("Trance", ("trance",)),
+    ("Elektronik", ("electronic", "edm", "electro", "dance")),
     ("R&B", ("r&b", "rnb", "soul", "funk")),
     ("Rock", ("rock", "metal", "punk", "alternative", "grunge")),
     ("Pop", ("pop",)),
