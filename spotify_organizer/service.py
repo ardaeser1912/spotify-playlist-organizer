@@ -124,6 +124,13 @@ class OrganizerService:
     def search(self, query: str) -> dict:
         return {"query": query, "tracks": self.client.search_tracks(query)}
 
+    def create_from(self, name: str, kind: str, query: str = "") -> dict:
+        """Keşif apply — top/arama sonuçlarından YENİ playlist (yedek gerekmez, hiçbir şey silinmez)."""
+        tracks = self.client.top_tracks() if kind == "top" else self.client.search_tracks(query)
+        default = "Top Liste" if kind == "top" else f"Arama: {query}"
+        res = self.client.create_playlist(name or default, _uris(tracks))
+        return {"created": [{"id": res["id"], "name": res["name"], "count": len(tracks)}]}
+
     def list_backups(self) -> list[dict]:
         if not os.path.isdir(self.backup_dir):
             return []

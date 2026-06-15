@@ -69,6 +69,11 @@ def test_top_ve_search(client):
     assert any("Tarkan" in t["artist"] for t in hits)
 
 
+def test_discover_apply_olusturur(client):
+    res = _data(client.post("/api/discover/apply", json={"kind": "search", "query": "tarkan", "name": "T"}))
+    assert res["created"][0]["count"] >= 1
+
+
 def test_apply_yedek_yazar_ve_listelenir(client, monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)  # backups/ tmp'ye düşsün
     res = _data(client.post("/api/split-genre/apply", json={"source": "liked"}))

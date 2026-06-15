@@ -98,6 +98,13 @@ def test_backups_listele_ve_restore(tmp_path):
     assert res["created"][0]["id"]
 
 
+def test_create_from_top_ve_arama(tmp_path):
+    s = svc(tmp_path)
+    assert s.create_from("", "top")["created"][0]["count"] > 0
+    res = s.create_from("Tarkan Listesi", "search", "tarkan")
+    assert res["created"][0]["name"] == "Tarkan Listesi" and res["created"][0]["count"] >= 1
+
+
 def test_enrich_fetch_ile_doldurur(tmp_path):
     s = OrganizerService(MockClient(), backup_dir=str(tmp_path / "b"),
                          bpm_fetch=lambda title, artist: {"bpm": 120, "camelot": "8A"})

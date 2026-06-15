@@ -5,6 +5,22 @@ export async function api(path) {
   return r.json()
 }
 
+// POST yardımcısı — body JSON, dönüş {success,data,error} zarfı.
+// Backend hata zarfını (success:false) okuyup mesajı fırlatır.
+export async function post(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  })
+  let j = null
+  try { j = await r.json() } catch { /* gövdesiz hata */ }
+  if (!r.ok || (j && j.success === false)) {
+    throw new Error((j && j.error) || `${path} → HTTP ${r.status}`)
+  }
+  return j
+}
+
 export function fmtDuration(ms) {
   const s = Math.round(ms / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`

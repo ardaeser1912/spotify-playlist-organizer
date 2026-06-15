@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, fmtDuration, camelotColor } from '../lib/api'
+import PreviewModal from '../components/PreviewModal'
 
 export default function PlaylistsView() {
   const [playlists, setPlaylists] = useState([])
@@ -8,7 +9,7 @@ export default function PlaylistsView() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [notice, setNotice] = useState(null)
+  const [modal, setModal] = useState(null)
 
   useEffect(() => {
     api('/api/playlists')
@@ -18,15 +19,12 @@ export default function PlaylistsView() {
   }, [])
 
   function open(id) {
-    setSelected(id); setDetail(null); setDetailLoading(true); setNotice(null)
+    setSelected(id); setDetail(null); setDetailLoading(true); setModal(null)
     api(`/api/playlist/${id}`)
       .then((r) => setDetail(r.data))
       .catch(() => setError('Playlist yüklenemedi'))
       .finally(() => setDetailLoading(false))
   }
-
-  // F3: loop bu placeholder'ı /api/split-genre ve /api/order önizle→uygula akışıyla değiştirir.
-  const comingSoon = (label) => setNotice(`“${label}” — mantık loop tarafından bağlanacak (önizle → uygula).`)
 
   return (
     <div className="flex h-full">
@@ -65,14 +63,22 @@ export default function PlaylistsView() {
             </header>
 
             <div className="reveal flex flex-wrap gap-3 mb-6" style={{ animationDelay: '60ms' }}>
-              <button className="btn btn-primary" onClick={() => comingSoon('Türe Göre Ayır')}>Türe Göre Ayır</button>
-              <button className="btn btn-ghost" onClick={() => comingSoon('Geçişli Sırala')}>Geçişli Sırala · DJ</button>
-              <button className="btn btn-ghost" onClick={() => comingSoon('Duplicate Temizle')}>Tekrarları Temizle</button>
+              <button className="btn btn-primary" onClick={() => setModal({
+                title: 'Türe Göre Ayır',
+                previewPath: '/api/split-genre/preview', applyPath: '/api/split-genre/apply',
+                kind: 'groups', applyLabel: 'Listeleri Oluştur',
+              })}>Türe Göre Ayır</button>
+              <button className="btn btn-ghost" onClick={() => setModal({
+                title: 'Geçişli Sırala',
+                previewPath: '/api/order/preview', applyPath: '/api/order/apply',
+                kind: 'tracks', applyLabel: 'Uygula',
+              })}>Geçişli Sırala · DJ</button>
+              <button className="btn btn-ghost" onClick={() => setModal({
+                title: 'Tekrarları Temizle',
+                previewPath: '/api/dedupe/preview', applyPath: '/api/dedupe/apply',
+                kind: 'dedupe', applyLabel: 'Tekrarları Sil',
+              })}>Tekrarları Temizle</button>
             </div>
-
-            {notice && (
-              <div className="reveal mb-6 surface px-4 py-3 text-sm text-[var(--dim)]">{notice}</div>
-            )}
 
             <ol className="reveal surface overflow-hidden" style={{ animationDelay: '120ms' }}>
               {detail.tracks.map((t, i) => (
@@ -90,6 +96,18 @@ export default function PlaylistsView() {
                 </li>
               ))}
             </ol>
+
+            <PreviewModal
+              open={modal !== null}
+              title={modal?.title}
+              previewPath={modal?.previewPath}
+              applyPath={modal?.applyPath}
+              kind={modal?.kind}
+              applyLabel={modal?.applyLabel}
+              body={{ source: detail.id }}
+              onClose={() => setModal(null)}
+              onApplied={() => setModal(null)}
+            />
           </div>
         )}
       </div>

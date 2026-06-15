@@ -160,6 +160,11 @@ def search():
     return _run(lambda s, b: s.search(b.get("query", "")))
 
 
+@app.post("/api/discover/apply")
+def discover_apply():
+    return _run(lambda s, b: s.create_from(b.get("name", ""), b.get("kind", "top"), b.get("query", "")))
+
+
 @app.get("/api/backups")
 def backups():
     return _run(lambda s, b: s.list_backups())

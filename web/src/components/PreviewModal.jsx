@@ -1,0 +1,187 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { post, fmtDuration, camelotColor } from '../lib/api'
+
+/**
+ * Paylaşılan Önizle → Uygula akışı (güvenlik çekirdeği).
+ * Açılınca previewPath'i POST'lar, sonucu kind'e göre gösterir; "Uygula" applyPath'i
+ * POST'lar (backend ÖNCE yedek alır), sonra onApplied(result) ile özet gösterir.
+ *
+ * Portal ile <body>'ye basılır → ata elemanlardaki transform (.reveal) fixed overlay'i bozmaz.
+ *
+ * Props: open, title, previewPath, applyPath, body, kind('tracks'|'groups'|'dedupe'),
+ *        applyLabel, onClose, onApplied(result)
+ */
+export default function PreviewModal({ open, title, previewPath, applyPath, body,
+                                       kind = 'tracks', applyLabel = 'Uygula',
+                                       onClose, onApplied }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [data, setData] = useState(null)
+  const [applying, setApplying] = useState(false)
+  const [done, setDone] = useState(null)
+
+  useEffect(() => {
+    if (!open) return
+    setData(null); setError(null); setDone(null); setLoading(true)
+    post(previewPath, body)
+      .then((r) => setData(r.data))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [open, previewPath, JSON.stringify(body)])
+
+  if (!open) return null
+
+  const nothingToApply = kind === 'dedupe' && data && data.removed_count === 0
+
+  async function apply() {
+    setApplying(true); setError(null)
+    try {
+      const r = await post(applyPath, body)
+      setDone(r.data)
+      onApplied?.(r.data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center p-4"
+         style={{ background: 'rgba(4,4,7,0.66)', backdropFilter: 'blur(4px)' }}
+         onClick={onClose}>
+      <div className="card reveal w-full max-w-2xl max-h-[85vh] flex flex-col"
+           style={{ animationDuration: '0.32s' }}
+           onClick={(e) => e.stopPropagation()}>
+        {/* başlık */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <div>
+            <div className="text-[0.66rem] tracking-[0.18em] uppercase text-[var(--amber)]">Önizleme</div>
+            <h3 className="text-xl">{title}</h3>
+          </div>
+          <button className="btn btn-ghost px-3 py-1.5" onClick={onClose} aria-label="Kapat">✕</button>
+        </div>
+
+        {/* gövde */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loading && <p className="text-sm text-[var(--dim)]">Önizleme hazırlanıyor…</p>}
+          {error && <p className="text-sm text-red-300/85">⚠ {error}</p>}
+          {done && <AppliedSummary data={done} />}
+          {!loading && !error && !done && data && <Preview kind={kind} data={data} />}
+        </div>
+
+        {/* alt çubuk */}
+        {!done && (
+          <div className="px-6 py-4 border-t border-[var(--border)]">
+            <p className="text-xs text-[var(--faint)] mb-3 flex items-center gap-1.5">
+              <span className="text-[var(--amber)]">⬡</span>
+              Uygulama geri dönüşü zordur — ama her şey önce otomatik yedeklenir, Yedekler’den geri alabilirsin.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button className="btn btn-ghost" onClick={onClose}>İptal</button>
+              <button className="btn btn-primary" onClick={apply}
+                      disabled={loading || applying || !!error || nothingToApply}>
+                {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
+              </button>
+            </div>
+          </div>
+        )}
+        {done && (
+          <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end">
+            <button className="btn btn-primary" onClick={onClose}>Bitti</button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function Preview({ kind, data }) {
+  if (kind === 'groups') {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-[var(--dim)]">{data.groups.length} yeni liste oluşturulacak:</p>
+        {data.groups.map((g) => (
+          <div key={g.bucket || g.label} className="surface px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-medium">{g.bucket || g.label}</span>
+              <span className="mono text-xs text-[var(--faint)]">{g.count} parça</span>
+            </div>
+            <div className="text-xs text-[var(--dim)] truncate">
+              {g.tracks.slice(0, 4).map((t) => t.title).join(' · ')}{g.tracks.length > 4 ? ' …' : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (kind === 'dedupe') {
+    return (
+      <div>
+        <p className="text-sm text-[var(--dim)] mb-3">
+          <span className="mono text-[var(--amber)]">{data.removed_count}</span> tekrar bulundu ·
+          <span className="mono"> {data.kept.length}</span> parça kalacak.
+        </p>
+        {data.removed_count === 0
+          ? <p className="text-sm text-[var(--dim)]">Tekrar yok — liste zaten temiz. 🎧</p>
+          : <TrackList tracks={data.removed} muted />}
+      </div>
+    )
+  }
+  // 'tracks'
+  return (
+    <>
+      <p className="text-sm text-[var(--dim)] mb-3">{data.tracks.length} parça · yeni sıra:</p>
+      <TrackList tracks={data.tracks} />
+    </>
+  )
+}
+
+function TrackList({ tracks, muted }) {
+  return (
+    <ol className="surface overflow-hidden">
+      {tracks.map((t, i) => (
+        <li key={t.id + '-' + i}
+            className={`flex items-center gap-3 px-4 py-2 border-b border-[var(--border)] last:border-0 ${muted ? 'opacity-60' : ''}`}>
+          <span className="mono w-6 text-right text-xs text-[var(--faint)]">{i + 1}</span>
+          <div className="flex-1 min-w-0">
+            <div className="truncate text-sm">{t.title}</div>
+            <div className="truncate text-xs text-[var(--dim)]">{t.artist}</div>
+          </div>
+          {t.camelot && (
+            <span className="chip text-black/85" style={{ background: camelotColor(t.camelot) }}>{t.camelot}</span>
+          )}
+          {t.bpm && <span className="mono text-xs text-[var(--dim)] w-14 text-right">{t.bpm} BPM</span>}
+          <span className="mono text-xs text-[var(--faint)] w-10 text-right">{fmtDuration(t.duration_ms)}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function AppliedSummary({ data }) {
+  const created = data.created || []
+  return (
+    <div className="text-center py-4">
+      <div className="w-12 h-12 mx-auto mb-3 rounded-full grid place-items-center text-[var(--amber)]"
+           style={{ border: '1px solid var(--border-strong)' }}>✓</div>
+      <h4 className="text-lg mb-1">Uygulandı</h4>
+      {created.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1.5 max-w-sm mx-auto text-left">
+          {created.map((c) => (
+            <div key={c.id} className="surface px-3 py-2 flex items-center justify-between">
+              <span className="truncate text-sm">{c.name}</span>
+              <span className="mono text-xs text-[var(--faint)]">{c.count} parça</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.updated && (
+        <p className="text-sm text-[var(--dim)] mt-2">Liste güncellendi · {data.updated.count} parça</p>
+      )}
+      {data.backup && <p className="mono text-xs text-[var(--faint)] mt-3">yedek alındı ✓</p>}
+    </div>
+  )
+}
