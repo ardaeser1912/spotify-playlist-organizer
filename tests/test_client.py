@@ -166,7 +166,20 @@ def test_normalize_full_track_happy():
         "camelot": None,
         "year": 2019,
         "popularity": 77,
+        "image": None,
     }
+
+
+def test_normalize_album_kapagi_secer():
+    # album.images içinden ~300px tercih edilir; yoksa ilk (en büyük).
+    src = _sp_track("t1")
+    src["album"]["images"] = [
+        {"url": "big", "width": 640}, {"url": "mid", "width": 300}, {"url": "sm", "width": 64}]
+    assert _normalize_track(src)["image"] == "mid"
+    src["album"]["images"] = [{"url": "only", "width": 640}]
+    assert _normalize_track(src)["image"] == "only"
+    src["album"]["images"] = []
+    assert _normalize_track(src)["image"] is None
 
 
 def test_normalize_year_full_date():

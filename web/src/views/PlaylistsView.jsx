@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, fmtDuration, camelotColor } from '../lib/api'
 import PreviewModal from '../components/PreviewModal'
+import AlbumArt from '../components/AlbumArt'
 
 export default function PlaylistsView() {
   const [playlists, setPlaylists] = useState([])
@@ -84,6 +85,7 @@ export default function PlaylistsView() {
               {detail.tracks.map((t, i) => (
                 <li key={t.id} className="flex items-center gap-4 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-white/[0.03]">
                   <span className="mono w-6 text-right text-sm text-[var(--faint)]">{i + 1}</span>
+                  <AlbumArt src={t.image} alt={t.title} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-[0.95rem]">{t.title}</div>
                     <div className="truncate text-xs text-[var(--dim)]">{t.artist}</div>

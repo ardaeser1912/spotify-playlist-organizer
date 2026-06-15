@@ -55,6 +55,12 @@ def _normalize_track(item: dict) -> dict | None:
         year = int(release[:4]) if release else None
     except ValueError:
         year = None
+    # Albüm kapağı: orta boy (~300px) tercih, yoksa ilk (en büyük); yoksa None.
+    images = album.get("images") or []
+    image = None
+    if images:
+        image = next((im.get("url") for im in images
+                      if im.get("width") and 200 <= im["width"] <= 400), images[0].get("url"))
     return {
         "id": item["id"],
         "title": item.get("name", ""),
@@ -66,6 +72,7 @@ def _normalize_track(item: dict) -> dict | None:
         "camelot": None,   # enrich.py doldurur
         "year": year,
         "popularity": item.get("popularity", 0),
+        "image": image,
     }
 
 

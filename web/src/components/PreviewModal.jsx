@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api, post, fmtDuration, camelotColor } from '../lib/api'
+import AlbumArt from './AlbumArt'
 
 /**
  * Paylaşılan Önizle → Uygula akışı (güvenlik çekirdeği).
@@ -327,6 +328,7 @@ function TrackList({ tracks, muted }) {
         <li key={t.id + '-' + i}
             className={`flex items-center gap-3 px-4 py-2 border-b border-[var(--border)] last:border-0 ${muted ? 'opacity-60' : ''}`}>
           <span className="mono w-6 text-right text-xs text-[var(--faint)]">{i + 1}</span>
+          <AlbumArt src={t.image} alt={t.title} size={40} />
           <div className="flex-1 min-w-0">
             <div className="truncate text-sm">{t.title}</div>
             <div className="truncate text-xs text-[var(--dim)]">{t.artist}</div>

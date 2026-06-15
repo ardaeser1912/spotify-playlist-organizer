@@ -40,6 +40,27 @@ _TRACKS = [
     ("t17", "Adsız Parça",        "a_unknown", None, None, 210, 2015, 20),
 ]
 
+# Albüm kapakları (DEMO için iTunes'tan gerçek görseller; gerçek modda Spotify sağlar).
+_b = "https://is1-ssl.mzstatic.com/image/thumb"
+_ART = {
+    "t01": f"{_b}/Music124/v4/35/8d/22/358d22cf-8b9c-1e7d-996d-85aad739a255/dj.nixigvoo.jpg/300x300bb.jpg",
+    "t02": f"{_b}/Music113/v4/f1/95/04/f1950424-2ae5-55ff-580d-d52e8300ec1b/dj.iedkotfi.jpg/300x300bb.jpg",
+    "t03": f"{_b}/Music211/v4/75/62/48/75624807-5b53-72a5-8926-cee76fa52091/25UMGIM92899.rgb.jpg/300x300bb.jpg",
+    "t04": f"{_b}/Music211/v4/75/62/48/75624807-5b53-72a5-8926-cee76fa52091/25UMGIM92899.rgb.jpg/300x300bb.jpg",
+    "t05": f"{_b}/Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg/300x300bb.jpg",
+    "t06": f"{_b}/Music116/v4/41/ee/66/41ee66fa-f8dd-7e82-155a-3a1b360dc562/190295322175.jpg/300x300bb.jpg",
+    "t07": f"{_b}/Music125/v4/a6/6e/bf/a66ebf79-5008-8948-b352-a790fc87446b/19UM1IM04638.rgb.jpg/300x300bb.jpg",
+    "t08": f"{_b}/Music124/v4/83/3a/f7/833af71b-2e0c-3303-24f5-8f5c546c073b/20UMGIM21167.rgb.jpg/300x300bb.jpg",
+    "t09": f"{_b}/Music221/v4/fd/4a/77/fd4a77db-0ebc-d043-41a2-f32fa1bb0fb4/dj.qrikkdwj.jpg/300x300bb.jpg",
+    "t10": f"{_b}/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/300x300bb.jpg",
+    "t11": f"{_b}/Music211/v4/18/5b/1e/185b1ef5-5d97-19d8-aebf-8e29e41874ef/13UAAIM59255.rgb.jpg/300x300bb.jpg",
+    "t12": f"{_b}/Music211/v4/67/38/43/67384338-9ed7-fc68-5927-93f1fcf4705d/11UMGIM36900.rgb.jpg/300x300bb.jpg",
+    "t13": f"{_b}/Music115/v4/f3/af/e2/f3afe2f1-c179-a0ce-347e-5431d7400305/cover.jpg/300x300bb.jpg",
+    "t14": f"{_b}/Music125/v4/08/23/fc/0823fcd9-cb44-695b-32bf-b3bf51d9f800/00606949351229.rgb.jpg/300x300bb.jpg",
+    "t15": f"{_b}/Features125/v4/bb/a2/f0/bba2f0d7-4d9e-c617-d49e-3ae02fd5d440/dj.xbkfgllk.jpg/300x300bb.jpg",
+    "t16": f"{_b}/Music124/v4/e2/8d/41/e28d412b-da8b-6f0b-227a-faa9a453e612/825646092666.jpg/300x300bb.jpg",
+}
+
 TRACKS = {
     tid: {
         "id": tid,
@@ -52,6 +73,7 @@ TRACKS = {
         "camelot": cam,
         "year": year,
         "popularity": pop,
+        "image": _ART.get(tid),
     }
     for (tid, title, aid, bpm, cam, dur, year, pop) in _TRACKS
 }
