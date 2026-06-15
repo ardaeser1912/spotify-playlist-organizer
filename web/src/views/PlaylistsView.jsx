@@ -106,7 +106,7 @@ export default function PlaylistsView() {
               applyLabel={modal?.applyLabel}
               body={{ source: detail.id }}
               onClose={() => setModal(null)}
-              onApplied={() => setModal(null)}
+              onApplied={() => { /* modal kendi başarı özetini gösterir; kullanıcı "Bitti" ile kapatır */ }}
             />
           </div>
         )}
