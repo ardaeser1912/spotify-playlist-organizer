@@ -28,23 +28,25 @@ def _service() -> OrganizerService:
     # Gerçek mod: spotipy (auth.py token cache). Loop CERRAH'ta buraya GİRMEZ.
     import spotipy
     from spotipy.oauth2 import SpotifyOAuth
+    from . import enrich
+    from .cache_layer import CachingClient
     from .client import REDIRECT_URI, SCOPES, SpotipyClient
-    from .enrich import build_getsongbpm_fetch
     # retries/status_retries=0: 429 (rate limit) gelince spotipy SAATLERCE retry-sleep
     # yapıp backend'i KİLİTLEMESİN → hızlı başarısız ol, UI net mesaj göstersin.
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
         scope=SCOPES, redirect_uri=os.environ.get("SPOTIPY_REDIRECT_URI", REDIRECT_URI),
         cache_path=".spotify_cache", open_browser=False),
         retries=0, status_retries=0, requests_timeout=20)
-    from .cache_layer import CachingClient
-    fetch = build_getsongbpm_fetch(os.environ.get("GETSONGBPM_API_KEY", ""))
     # CachingClient: 979 Beğenilenler'i bir kez çekip diske cache'ler → tekrarlı işlemler
     # anında gelir + Spotify rate-limit'ini bir daha tetiklemez.
     client = CachingClient(SpotipyClient(sp))
-    return OrganizerService(client, bpm_fetch=fetch, genre_provider=_genre_provider)
+    # BPM/Camelot cache-only: prewarm_bpm.py GetSongBPM'den doldurur, istek-yolunda ağ YOK.
+    bpm_cache = enrich.load_cache(_BPM_CACHE)
+    return OrganizerService(client, genre_provider=_genre_provider, bpm_cache=bpm_cache)
 
 
 _GENRE_CACHE = "cache/genres.json"
+_BPM_CACHE = "cache/bpm.json"
 
 
 def _genre_provider(names):

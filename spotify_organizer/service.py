@@ -28,12 +28,16 @@ def _is_liked(source: str) -> bool:
 
 
 class OrganizerService:
-    def __init__(self, client, backup_dir: str = "backups", bpm_fetch=None, genre_provider=None):
+    def __init__(self, client, backup_dir: str = "backups", bpm_fetch=None,
+                 genre_provider=None, bpm_cache=None):
         self.client = client
         self.backup_dir = backup_dir
-        self.bpm_fetch = bpm_fetch  # CERRAH: None → enrich gerçek çağrı yapmaz
+        self.bpm_fetch = bpm_fetch  # genelde None (istek-yolunda GetSongBPM çağrısı yok)
         # genre_provider(artist_names:set)->{name:kova}: Spotify türü yoksa (gerçek mod 403) iTunes fallback
         self.genre_provider = genre_provider
+        # bpm_cache: {f"{title}|{artist}".lower(): {"bpm":int,"camelot":str}} — prewarm_bpm.py doldurur,
+        # panel buradan ANINDA okur (979 şarkıyı GetSongBPM'le tekrar tekrar sorgulamaz).
+        self.bpm_cache = bpm_cache if bpm_cache is not None else {}
 
     # ---------- yardımcılar ----------
     def _tracks_for(self, source: str) -> list[dict]:
@@ -70,9 +74,9 @@ class OrganizerService:
         return labels
 
     def _enriched(self, tracks: list[dict]) -> list[dict]:
-        """Eksik bpm/camelot'u (mock fetch) doldur — bpm_fetch None ise dokunmaz."""
+        """Eksik bpm/camelot'u bpm_cache'ten (prewarm) doldur; cache yoksa dokunmaz."""
         if any(t.get("bpm") is None or t.get("camelot") is None for t in tracks):
-            return enrich.enrich_tracks(tracks, fetch=self.bpm_fetch)
+            return enrich.enrich_tracks(tracks, fetch=self.bpm_fetch, cache=self.bpm_cache)
         return tracks
 
     def _backup(self, label: str, tracks: list[dict]) -> str:

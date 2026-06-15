@@ -145,10 +145,12 @@ def build_getsongbpm_fetch(api_key: str):
         if not api_key or requests is None:
             return None
 
-        url = "https://api.getsongbpm.com/search/"
+        # Gerçek API: base api.getsong.co (api.getsongbpm.com Cloudflare'a takılır);
+        # song+artist birlikte arama type=both ister (canlı doğrulandı).
+        url = "https://api.getsong.co/search/"
         params = {
             "api_key": api_key,
-            "type": "song",
+            "type": "both",
             "lookup": f"song:{title} artist:{artist}",
         }
         try:
