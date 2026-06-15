@@ -135,3 +135,151 @@ def test_open_key_gecersiz():
 def test_build_fetch_bos_key_none():
     fetch = enrich.build_getsongbpm_fetch("")
     assert fetch("Şımarık", "Tarkan") is None
+
+
+# --- build_getsongbpm_fetch: dayanıklılık (monkeypatch, GERÇEK AĞ YOK) ---
+
+class _FakeResp:
+    """requests.Response taklidi — sadece test için."""
+
+    def __init__(self, payload, *, raise_status=False):
+        self._payload = payload
+        self._raise_status = raise_status
+
+    def raise_for_status(self):
+        if self._raise_status:
+            raise RuntimeError("HTTP 500")
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+def _patch_get(monkeypatch, resp_or_exc):
+    """enrich.requests.get'i ağsız sahte ile değiştirir."""
+    def fake_get(url, params=None, timeout=None):
+        if isinstance(resp_or_exc, Exception):
+            raise resp_or_exc
+        return resp_or_exc
+    monkeypatch.setattr(enrich.requests, "get", fake_get)
+
+
+def test_fetch_basarili_cevap_bpm_camelot(monkeypatch):
+    payload = {"search": [{"tempo": "120", "key_of": "G", "open_key": "9d"}]}
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    data = fetch("Şarkı", "Sanatçı")
+    assert data == {"bpm": 120, "camelot": enrich.open_key_to_camelot("9d")}
+
+
+def test_fetch_bos_search_none(monkeypatch):
+    _patch_get(monkeypatch, _FakeResp({"search": []}))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_search_anahtari_yok_none(monkeypatch):
+    _patch_get(monkeypatch, _FakeResp({"error": "nope"}))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_payload_dict_degil_none(monkeypatch):
+    _patch_get(monkeypatch, _FakeResp(["liste", "değil", "dict"]))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_tempo_yok_camelot_dolu_bpm_none(monkeypatch):
+    payload = {"search": [{"open_key": "9d"}]}  # tempo yok
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    data = fetch("x", "y")
+    assert data["bpm"] is None
+    assert data["camelot"] == enrich.open_key_to_camelot("9d")
+
+
+def test_fetch_open_key_yok_key_of_fallback(monkeypatch):
+    payload = {"search": [{"tempo": "100", "key_of": "Am"}]}  # open_key yok
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    data = fetch("x", "y")
+    assert data["bpm"] == 100
+    assert data["camelot"] == "8A"  # Am → 8A
+
+
+def test_fetch_open_key_oncelikli(monkeypatch):
+    # open_key VARSA key_of'a düşmez; open_key kazanır
+    payload = {"search": [{"tempo": "90", "open_key": "1d", "key_of": "Am"}]}
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    data = fetch("x", "y")
+    assert data["camelot"] == "8B"  # open_key 1d → 8B (Am olsaydı 8A olurdu)
+
+
+def test_fetch_tempo_ve_anahtar_yok_none(monkeypatch):
+    payload = {"search": [{"title": "no tempo no key"}]}
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_tempo_float_string(monkeypatch):
+    payload = {"search": [{"tempo": "128.7", "open_key": "1m"}]}
+    _patch_get(monkeypatch, _FakeResp(payload))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    data = fetch("x", "y")
+    assert data["bpm"] == 128  # "128.7" → 128
+
+
+def test_fetch_http_exception_none(monkeypatch):
+    # raise_for_status patlar → None
+    _patch_get(monkeypatch, _FakeResp({"search": [{"tempo": "120"}]}, raise_status=True))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_requests_exception_none(monkeypatch):
+    # requests.get'in kendisi patlar (bağlantı hatası)
+    _patch_get(monkeypatch, RuntimeError("connection refused"))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_timeout_none(monkeypatch):
+    class _Timeout(Exception):
+        pass
+    _patch_get(monkeypatch, _Timeout("timed out"))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_json_decode_hatasi_none(monkeypatch):
+    # resp.json() patlar (JSON değil)
+    _patch_get(monkeypatch, _FakeResp(ValueError("not json")))
+    fetch = enrich.build_getsongbpm_fetch("KEY")
+    assert fetch("x", "y") is None
+
+
+def test_fetch_bos_key_aga_cikmaz(monkeypatch):
+    # api_key boşsa requests.get HİÇ çağrılmamalı
+    def boom(*a, **k):
+        raise AssertionError("ağa çıkıldı!")
+    monkeypatch.setattr(enrich.requests, "get", boom)
+    fetch = enrich.build_getsongbpm_fetch("")
+    assert fetch("x", "y") is None
+
+
+# --- key_of_to_camelot doğrudan ---
+
+def test_key_of_to_camelot_major_minor():
+    assert enrich.key_of_to_camelot("C") == "8B"
+    assert enrich.key_of_to_camelot("Am") == "8A"
+    assert enrich.key_of_to_camelot("F#m") == "11A"
+
+
+def test_key_of_to_camelot_gecersiz():
+    assert enrich.key_of_to_camelot("") is None
+    assert enrich.key_of_to_camelot("Zzz") is None
+    assert enrich.key_of_to_camelot(None) is None
