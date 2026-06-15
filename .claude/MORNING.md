@@ -71,7 +71,21 @@ Spotify türü vermiyor (403) → türü **ücretsiz/anahtarsız MusicBrainz + i
 - **AKILLI MİX (Smart Mix):** yeni araç — türe kümele + küme-içi akıcı geçiş (BPM/Camelot varsa Camelot harmonic, yoksa dönem/yıl akışı). 979 parça sıralanıp kopya playlist olur. `smartmix.py` + `/api/smartmix/*`.
 - Mimari: `genre_source.py` (iTunes+MB→kova, cache-only sağlayıcı), `OrganizerService(genre_provider=...)` Spotify-türü-yoksa fallback, ToolsView "Akıllı Mix" kartı. cache/genres.json gitignore'da. Commit'ler `cc364a2`/`4df786b`/fallback.
 
-Geriye Şef'e bağlı: GetSongBPM key (DJ/BPM için) · GitHub push · (istersen) Diğer-23 için elle tür ataması.
+Geriye Şef'e bağlı: GetSongBPM key (DJ/BPM için) · GitHub push.
+
+## 🧱 SPOTIFY YAZMA ENGELİ + DIŞA AKTAR + İNCE TÜRLER (15 Haz, Şef "kusursuz olsun + ince türler" dedi) — 253 test
+- **KRİTİK BULGU: Spotify dev-mode app PLAYLIST OLUŞTURAMIYOR/YAZAMIYOR** — `user_playlist_create` 403 (kendi hesabına bile "weseas", scope DOĞRU `playlist-modify-private`, User Management'a eklendi, token tazelendi → HEP 403). Bazı takip-listelerini OKUMA da 403. Kodla aşılamaz; extended quota gerekir (nadiren onaylanır). Şef "ikisini de" seçti.
+- **ÇÖZÜM = DIŞA AKTAR (PreviewModal):** Türe Ayır/Akıllı Mix önizleme sonucu **CSV indir** (Grup,Başlık,Sanatçı,Spotify Linki) + **Linkleri Kopyala** + apply 403'te **zarif Türkçe uyarı** (ham hata yerine). Aracın beyni tam çalışır, Spotify'a yazmadan.
+- **İNCE TÜRLER (13 kova):** Hard Tekno/Tekno/House/Trap/Drum&Bass/Trance/Hip-Hop/R&B/Rock/Pop/Arabesk/Elektronik/Diğer. Gerçek 979: Hip-Hop 281·Trap 146·House 99·Hard Tekno 96·Tekno 33·Elektronik 122·Pop 60·R&B 34·Rock 63·Diğer 23. `genre_source._BUCKETS` öncelikli (spesifik üstte). Görsel doğrulandı (`/tmp/spo-shot/e1`).
+- **Extended quota başvuru taslağı:** `SPOTIFY-EXTENDED-QUOTA.md` (Şef doldurup gönderir; onay gelirse kod değişmeden "Uygula" yazar).
+- Commit'ler `329c228`/`33f4678`. cache/genres.json gitignore'da (497 sanatçı ham tür).
+
+## 🎨 UI/UX CİLA LOOP BACKLOG (Şef "loopa tekrar başla, kusursuz olsun" dedi)
+- (p1) **Beğenilenler'i PlaylistsView kitaplığına ekle** — ana kullanılır veri (979) şu an sol listede YOK (sadece 11 takip-liste var, çoğu 403/boş). Beğenilenler'i başa, belirgin ekle (client "liked" sözde-liste + playlist_tracks("liked")→liked_tracks).
+- (p2) **Gerçek modda "Uygula" yerine "Dışa Aktar"ı birincil yap** (write 403 kesin) — Uygula'yı ikincil/uyarılı göster.
+- (p3) **Akıllı Mix önizlemede tür kümelerini göster** (şu an düz liste) + yavaş-işlem (979 ~5sn) için "Spotify'dan çekiliyor…" ilerleme ipucu.
+- (p4) **İçgörüler 13 ince türle taşma/sıra kontrolü** + responsive/mobil + motion cilası.
+- (p5) Görsel QA her turda; pytest+build yeşil; küçük commit; PUSH YOK.
 
 ## 🟡 Şef kararı / doğrulama bekleyenler
 - **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.
