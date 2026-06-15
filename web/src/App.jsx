@@ -57,6 +57,17 @@ export default function App() {
 
       {/* Content */}
       <main aria-label="İçerik" className="flex-1 overflow-y-auto">
+        {me?.demo && (
+          <div className="m-4 mb-0 px-4 py-3 rounded-[var(--r-sm)] text-sm flex items-start gap-2.5"
+               style={{ background: 'rgba(255,178,76,0.08)', border: '1px solid rgba(255,178,76,0.30)' }}>
+            <span className="text-[var(--amber)] mt-0.5">⚠️</span>
+            <span className="text-[var(--dim)] leading-relaxed">
+              <b className="text-[var(--text)]">DEMO veri gösteriliyor</b> — bunlar örnek şarkılar, senin hesabın değil.
+              Gerçek Spotify kütüphanen (Beğenilenler + albüm kapakları + DJ geçişleri), hesabın bağlanıp Spotify
+              geçici limiti kalkınca <b className="text-[var(--text)]">otomatik</b> gelir.
+            </span>
+          </div>
+        )}
         <Active key={view} />
       </main>
     </div>
