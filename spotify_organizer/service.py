@@ -14,7 +14,7 @@ import os
 import re
 from datetime import datetime
 
-from . import enrich, genre, order, organize
+from . import enrich, genre, order, organize, smartmix
 
 LIKED = ("liked", "p_liked")
 
@@ -28,10 +28,12 @@ def _is_liked(source: str) -> bool:
 
 
 class OrganizerService:
-    def __init__(self, client, backup_dir: str = "backups", bpm_fetch=None):
+    def __init__(self, client, backup_dir: str = "backups", bpm_fetch=None, genre_provider=None):
         self.client = client
         self.backup_dir = backup_dir
         self.bpm_fetch = bpm_fetch  # CERRAH: None → enrich gerçek çağrı yapmaz
+        # genre_provider(artist_names:set)->{name:kova}: Spotify türü yoksa (gerçek mod 403) iTunes fallback
+        self.genre_provider = genre_provider
 
     # ---------- yardımcılar ----------
     def _tracks_for(self, source: str) -> list[dict]:
@@ -46,6 +48,26 @@ class OrganizerService:
     def _artist_genres(self, tracks: list[dict]) -> dict:
         ids = [t["artist_id"] for t in tracks if t.get("artist_id")]
         return self.client.artist_genres(ids) if ids else {}
+
+    def _genre_labels(self, tracks: list[dict]) -> dict:
+        """{track_id: kova}. Önce Spotify türü (DEMO/öncelik); eksikse iTunes sağlayıcı (gerçek mod)."""
+        ag = self._artist_genres(tracks)
+        labels: dict = {}
+        missing = []
+        for t in tracks:
+            g = ag.get(t.get("artist_id"), [])
+            if g:
+                labels[t["id"]] = genre.normalize_bucket(g)
+            else:
+                missing.append(t)
+        if missing and self.genre_provider:
+            by_name = self.genre_provider({t["artist"] for t in missing if t.get("artist")}) or {}
+            for t in missing:
+                labels[t["id"]] = by_name.get(t.get("artist"), "Diğer")
+        else:
+            for t in missing:
+                labels[t["id"]] = "Diğer"
+        return labels
 
     def _enriched(self, tracks: list[dict]) -> list[dict]:
         """Eksik bpm/camelot'u (mock fetch) doldur — bpm_fetch None ise dokunmaz."""
@@ -76,8 +98,10 @@ class OrganizerService:
     # ---------- PREVIEW (mutasyon YOK) ----------
     def preview_split_genre(self, source: str) -> dict:
         tracks = self._tracks_for(source)
-        ag = self._artist_genres(tracks)
-        groups = genre.split_by_genre(tracks, ag)
+        labels = self._genre_labels(tracks)
+        groups: dict = {}
+        for t in tracks:  # giriş sırasını koru
+            groups.setdefault(labels.get(t["id"], "Diğer"), []).append(t)
         return {"source": source,
                 "groups": [{"bucket": b, "count": len(ts), "tracks": ts} for b, ts in groups.items()]}
 
@@ -114,9 +138,21 @@ class OrganizerService:
 
     def insights(self, source: str) -> dict:
         tracks = self._enriched(self._tracks_for(source))
-        ag = self._artist_genres(tracks)
-        labels = {t["id"]: genre.normalize_bucket(ag.get(t.get("artist_id"), [])) for t in tracks}
+        labels = self._genre_labels(tracks)
         return organize.insights(tracks, genre_labels=labels)
+
+    # ---------- Akıllı Mix (Smart Mix) ----------
+    def preview_smartmix(self, source: str) -> dict:
+        tracks = self._enriched(self._tracks_for(source))
+        labels = self._genre_labels(tracks)
+        groups = smartmix.smart_order_groups(tracks, genre_of=labels)
+        ordered = smartmix.smart_order(tracks, genre_of=labels)
+        return {"source": source, "tracks": ordered,
+                "groups": [{"bucket": g["bucket"], "count": g["count"]} for g in groups]}
+
+    def apply_smartmix(self, source: str) -> dict:
+        ordered = self.preview_smartmix(source)["tracks"]
+        return self._apply_to_target(source, f"{self._name_for(source)} (Akıllı Mix)", ordered)
 
     def top(self) -> dict:
         return {"tracks": self.client.top_tracks(), "artists": self.client.top_artists()}

@@ -34,7 +34,24 @@ def _service() -> OrganizerService:
         scope=SCOPES, redirect_uri=os.environ.get("SPOTIPY_REDIRECT_URI", REDIRECT_URI),
         cache_path=".spotify_cache", open_browser=False))
     fetch = build_getsongbpm_fetch(os.environ.get("GETSONGBPM_API_KEY", ""))
-    return OrganizerService(SpotipyClient(sp), bpm_fetch=fetch)
+    return OrganizerService(SpotipyClient(sp), bpm_fetch=fetch, genre_provider=_genre_provider)
+
+
+_GENRE_CACHE = "cache/genres.json"
+
+
+def _genre_provider(names):
+    """Tür kovası: cache/genres.json'dan SADECE OKUR (istek anında ağ YOK; prewarm_genres.py
+    MusicBrainz'den doldurur). Önbellekte olmayan sanatçı → 'Diğer'."""
+    from . import genre_source
+    cache = genre_source.load_cache(_GENRE_CACHE)
+    out = {}
+    for n in names:
+        if not n:
+            continue
+        raw = cache.get(n.lower())
+        out[n] = genre_source.OTHER if raw is None else genre_source.itunes_to_bucket(raw)
+    return out
 
 
 def _ok(data):
@@ -170,6 +187,17 @@ def search():
 @app.post("/api/discover/apply")
 def discover_apply():
     return _run(lambda s, b: s.create_from(b.get("name", ""), b.get("kind", "top"), b.get("query", "")))
+
+
+# ---------- Akıllı Mix ----------
+@app.post("/api/smartmix/preview")
+def smartmix_preview():
+    return _run(lambda s, b: s.preview_smartmix(b.get("source", "liked")))
+
+
+@app.post("/api/smartmix/apply")
+def smartmix_apply():
+    return _run(lambda s, b: s.apply_smartmix(b.get("source", "liked")))
 
 
 @app.get("/api/backups")

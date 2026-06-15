@@ -6,6 +6,7 @@ import PreviewModal from '../components/PreviewModal'
 const TOOLS = [
   { key: 'genre', title: 'Türe Göre Ayır', desc: 'Karışık listeyi türe göre yeni playlist’lere böl.', tag: 'Playlist' },
   { key: 'order', title: 'Geçişli Sırala · DJ', desc: 'Harmonic mixing (Camelot) + BPM rampasıyla akıcı geçiş.', tag: 'Sıralama' },
+  { key: 'smartmix', title: 'Akıllı Mix', desc: 'Türe göre kümele + akıcı geçişlerle akıllıca sırala (Smart Mix).', tag: 'Sıralama' },
   { key: 'dedupe', title: 'Tekrarları Temizle', desc: 'Aynı parçanın kopyalarını bul ve kaldır.', tag: 'Temizlik' },
   { key: 'sort', title: 'Çok-Anahtarlı Sırala', desc: 'Sanatçı · albüm · tarih · popülerlik · BPM · süre.', tag: 'Sıralama' },
   { key: 'merge', title: 'Birleştir', desc: 'Birden fazla playlist’i tek listede topla.', tag: 'Playlist' },
@@ -156,6 +157,8 @@ function MutationFlow({ tool, playlists, plLoading, plError }) {
     cfg = { previewPath: '/api/split-genre/preview', applyPath: '/api/split-genre/apply', body: { source }, kind: 'groups', applyLabel: 'Uygula' }
   } else if (tool.key === 'order') {
     cfg = { previewPath: '/api/order/preview', applyPath: '/api/order/apply', body: { source }, kind: 'tracks', applyLabel: 'Uygula' }
+  } else if (tool.key === 'smartmix') {
+    cfg = { previewPath: '/api/smartmix/preview', applyPath: '/api/smartmix/apply', body: { source }, kind: 'tracks', applyLabel: 'Akıllı Mix Uygula' }
   } else if (tool.key === 'dedupe') {
     cfg = { previewPath: '/api/dedupe/preview', applyPath: '/api/dedupe/apply', body: { source }, kind: 'dedupe', applyLabel: 'Temizle' }
   } else if (tool.key === 'sort') {
