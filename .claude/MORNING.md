@@ -46,6 +46,9 @@ cd web && npm run dev
 - **F6** README + bu dosya + `auth.py` (tek seferlik OAuth) yazıldı.
 - Tümü branch `loop/v1`'de küçük commit'lerle (PUSH YOK). Gerçek API/auth ÇAĞRILMADI (CERRAH).
 
+## 🛡️ Sertleştirme loop'u (Şef "güvenli hardening" seçti, paralel ajanlar)
+- **Tur 1:** +33 edge-case testi (boş/tek/None/sınır/eksik-dosya → toplam **130 test**, crash bulunmadı, hepsi zaten sağlamdı) · PreviewModal a11y (role=dialog/aria-modal, Escape ile kapat, focus-trap + odak iadesi) · shell/nav a11y (aria-label, aria-current, ikon aria-hidden). Build temiz.
+
 ## 🟡 Şef kararı / doğrulama bekleyenler
 - **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.
 - **Tür kova önceliği:** Arabesk > Hip-Hop > Elektronik > R&B > Rock > Pop (ilk eşleşen kazanır). DEMO'da doğru görünüyor; gerçek kütüphanende tuhaf bir eşleme olursa `genre.py` tablosuna kova/anahtar ekleriz.

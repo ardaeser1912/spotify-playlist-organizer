@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { post, fmtDuration, camelotColor } from '../lib/api'
 
@@ -21,6 +21,10 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   const [applying, setApplying] = useState(false)
   const [done, setDone] = useState(null)
 
+  const dialogRef = useRef(null)
+  const titleId = useRef('preview-modal-title-' + Math.random().toString(36).slice(2)).current
+  const opener = useRef(null)
+
   useEffect(() => {
     if (!open) return
     setData(null); setError(null); setDone(null); setLoading(true)
@@ -29,6 +33,51 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [open, previewPath, JSON.stringify(body)])
+
+  // Erişilebilirlik: Escape ile kapat + basit focus-trap (Tab/Shift+Tab sarması)
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose?.()
+        return
+      }
+      if (e.key === 'Tab') {
+        const root = dialogRef.current
+        if (!root) return
+        const focusables = root.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        )
+        if (focusables.length === 0) return
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
+
+  // Erişilebilirlik: açılışta odağı modal içine al, kapanışta açan öğeye geri ver
+  useEffect(() => {
+    if (!open) return
+    opener.current = document.activeElement
+    const root = dialogRef.current
+    const focusables = root?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    focusables?.[0]?.focus()
+    return () => {
+      opener.current?.focus?.()
+    }
+  }, [open])
 
   if (!open) return null
 
@@ -51,14 +100,15 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
     <div className="fixed inset-0 z-50 grid place-items-center p-4"
          style={{ background: 'rgba(4,4,7,0.66)', backdropFilter: 'blur(4px)' }}
          onClick={onClose}>
-      <div className="card reveal w-full max-w-2xl max-h-[85vh] flex flex-col"
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+           className="card reveal w-full max-w-2xl max-h-[85vh] flex flex-col"
            style={{ animationDuration: '0.32s' }}
            onClick={(e) => e.stopPropagation()}>
         {/* başlık */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <div>
             <div className="text-[0.66rem] tracking-[0.18em] uppercase text-[var(--amber)]">Önizleme</div>
-            <h3 className="text-xl">{title}</h3>
+            <h3 id={titleId} className="text-xl">{title}</h3>
           </div>
           <button className="btn btn-ghost px-3 py-1.5" onClick={onClose} aria-label="Kapat">✕</button>
         </div>

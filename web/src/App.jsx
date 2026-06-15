@@ -25,7 +25,7 @@ export default function App() {
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <aside className="w-64 shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--bg-1)]/70 backdrop-blur">
+      <aside aria-label="Kenar çubuğu" className="w-64 shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--bg-1)]/70 backdrop-blur">
         <div className="brand flex items-center gap-3 px-5 pt-6 pb-5">
           <span className="disc" />
           <div className="leading-tight">
@@ -34,11 +34,11 @@ export default function App() {
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3 mt-2">
+        <nav aria-label="Ana gezinme" className="flex flex-col gap-1 px-3 mt-2">
           {NAV.map((n) => {
             const Icon = n.icon
             return (
-              <button key={n.id} className={`nav-item ${view === n.id ? 'active' : ''}`} onClick={() => setView(n.id)}>
+              <button key={n.id} aria-current={view === n.id ? 'page' : undefined} className={`nav-item ${view === n.id ? 'active' : ''}`} onClick={() => setView(n.id)}>
                 <Icon active={view === n.id} />
                 {n.label}
               </button>
@@ -56,7 +56,7 @@ export default function App() {
       </aside>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto">
+      <main aria-label="İçerik" className="flex-1 overflow-y-auto">
         <Active key={view} />
       </main>
     </div>
@@ -67,7 +67,7 @@ export default function App() {
 function IconDisc({ active }) {
   const c = active ? 'var(--amber)' : 'currentColor'
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6">
       <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.2" fill={c} stroke="none" />
     </svg>
   )
@@ -75,7 +75,7 @@ function IconDisc({ active }) {
 function IconChart({ active }) {
   const c = active ? 'var(--amber)' : 'currentColor'
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round">
       <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
     </svg>
   )
@@ -83,7 +83,7 @@ function IconChart({ active }) {
 function IconTool({ active }) {
   const c = active ? 'var(--amber)' : 'currentColor'
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4 2.5-2.5Z" />
     </svg>
   )
@@ -91,7 +91,7 @@ function IconTool({ active }) {
 function IconArchive({ active }) {
   const c = active ? 'var(--amber)' : 'currentColor'
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
     </svg>
   )
