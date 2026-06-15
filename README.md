@@ -4,6 +4,9 @@ Karışık playlist'leri / Beğenilenler'i düzenleyen **görsel, çok işlevli 
 "Gece Stüdyosu" koyu teması. Backend: Python + Flask + spotipy. Frontend: React + Vite + Tailwind.
 Çekirdek mantık saf Python modüllerinde (test edilebilir, API'den bağımsız).
 
+> **BPM & musical key data powered by [GetSongBPM](https://getsongbpm.com).**
+> Tempo and key information used for harmonic DJ mixing is provided by [GetSongBPM.com](https://getsongbpm.com).
+
 ## ✨ İşlevler
 1. **Türe Göre Ayır** — karışık listeyi türe göre yeni playlist'lere böl (orijinal korunur).
 2. **Geçişli Sırala · DJ** — harmonic mixing (Camelot çarkı) + BPM rampasıyla akıcı geçiş.

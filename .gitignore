@@ -19,3 +19,6 @@ node_modules/
 dist/
 web/dist/
 *.log
+
+# Loop dev notları (public repo'da olmasın, yerelde kalsın)
+.claude/
