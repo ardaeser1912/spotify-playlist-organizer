@@ -61,7 +61,17 @@ cd web && npm run dev
 - **GetSongBPM key eklenirse:** BPM+Camelot gelir → DJ Geçişli Sırala + tempo böl + BPM içgörü açılır (tek eksik, kolay).
 - Gerçek panel: `python -m spotify_organizer.app` (DEMO'suz) + `cd web && npm run dev` → localhost:5173. Commit'ler `b5cde4c`/`21f1c5b` (loop/v1, PUSH YOK).
 
-Geriye Şef'e bağlı: GetSongBPM key (BPM için) · GitHub push · tür/popülerlik için Spotify extended-access başvurusu (opsiyonel).
+Geriye Şef'e bağlı: GetSongBPM key (BPM için) · GitHub push.
+
+## 🏷️ TÜRE AYIR + AKILLI MİX ÇÖZÜLDÜ (15 Haz, Şef "türe göre de ayıralım + Akıllı Mix" dedi) — 243 test
+Spotify türü vermiyor (403) → türü **ücretsiz/anahtarsız MusicBrainz + iTunes'tan** çekip `cache/genres.json`'a ısıttık. Artık Türe Ayır + tür dağılımı GERÇEK hesapta çalışıyor.
+- **Tür kaynağı stratejisi:** MusicBrainz birincil (anahtarsız, ~1 istek/sn, bloklamaz) → kalan "Diğer"leri iTunes doldurur (Türkçe rap'te iTunes güçlü: Ceza→"Turkish Hip-Hop/Rap"). **UYARI: iTunes hızlı/toplu çekimde IP-throttle yapar (8/sn → 410/497 None oldu); ~20/dk + cooldown şart.** MB güvenli ama Türkçe zayıf → ikisi birlikte ideal.
+- **prewarm_genres.py** (MB, ~9 dk) + **prewarm_fallback.py** (iTunes ile Diğer doldur, ~8 dk). Tür eklenince/yeni şarkıda yeniden çalıştır.
+- **SONUÇ (979 Beğenilenler):** Hip-Hop **531** · Elektronik 258 · Rock 70 · Pop 60 · R&B 35 · Arabesk 2 · **Diğer sadece 23** (≈%98 doğru). Görsel doğrulandı (`/tmp/spo-shot/g2,g3`).
+- **AKILLI MİX (Smart Mix):** yeni araç — türe kümele + küme-içi akıcı geçiş (BPM/Camelot varsa Camelot harmonic, yoksa dönem/yıl akışı). 979 parça sıralanıp kopya playlist olur. `smartmix.py` + `/api/smartmix/*`.
+- Mimari: `genre_source.py` (iTunes+MB→kova, cache-only sağlayıcı), `OrganizerService(genre_provider=...)` Spotify-türü-yoksa fallback, ToolsView "Akıllı Mix" kartı. cache/genres.json gitignore'da. Commit'ler `cc364a2`/`4df786b`/fallback.
+
+Geriye Şef'e bağlı: GetSongBPM key (DJ/BPM için) · GitHub push · (istersen) Diğer-23 için elle tür ataması.
 
 ## 🟡 Şef kararı / doğrulama bekleyenler
 - **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.
