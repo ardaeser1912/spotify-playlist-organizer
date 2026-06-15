@@ -11,7 +11,7 @@ function BarRow({ label, value, max }) {
       <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
         <div
           className="h-2 rounded-full"
-          style={{ width: pct + '%', background: 'linear-gradient(90deg,var(--amber),var(--amber-deep))' }}
+          style={{ width: pct + '%', background: 'linear-gradient(90deg,var(--amber),var(--amber-deep))', transition: 'width .5s cubic-bezier(0.2,0.7,0.2,1)' }}
         />
       </div>
       <div className="mono text-sm text-[var(--faint)] w-8 text-right">{value}</div>
@@ -20,14 +20,19 @@ function BarRow({ label, value, max }) {
 }
 
 // Bir dağılım sözlüğünü ({etiket: sayı}) çubuklara dönüştüren kart gövdesi.
-function DistBars({ dist, order }) {
+// order verilmezse satırlar sayıya göre AZALAN sıralanır; scroll=true ise
+// çok satırda kart içinde dikey kaydırma + ince scrollbar.
+function DistBars({ dist, order, scroll }) {
   const entries = order
     ? order.filter((k) => k in dist).map((k) => [k, dist[k]])
-    : Object.entries(dist)
+    : Object.entries(dist).sort((a, b) => b[1] - a[1])
   const max = entries.reduce((m, [, v]) => Math.max(m, v), 0)
   if (entries.length === 0) return <p className="text-sm text-[var(--faint)]">Veri yok</p>
   return (
-    <div className="flex flex-col gap-2.5">
+    <div
+      className="flex flex-col gap-2.5 overflow-y-auto pr-1"
+      style={scroll ? { maxHeight: '15.5rem', scrollbarWidth: 'thin' } : undefined}
+    >
       {entries.map(([label, value]) => (
         <BarRow key={label} label={label} value={value} max={max} />
       ))}
@@ -114,7 +119,7 @@ export default function InsightsView() {
       {!loading && !error && data && !empty && (
         <>
           {/* özet istatistikler */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div style={{ animationDelay: '0ms' }} className="reveal card p-5">
               <div className="text-[0.7rem] tracking-[0.18em] uppercase text-[var(--faint)] mb-2">Toplam parça</div>
               <div className="mono text-4xl text-[var(--text)]">{data.total}</div>
@@ -128,7 +133,7 @@ export default function InsightsView() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div style={{ animationDelay: '120ms' }} className="reveal card p-5">
               <h3 className="text-lg mb-4">Tür Dağılımı</h3>
-              <DistBars dist={data.genre_dist || {}} />
+              <DistBars dist={data.genre_dist || {}} scroll />
             </div>
 
             <div style={{ animationDelay: '180ms' }} className="reveal card p-5">

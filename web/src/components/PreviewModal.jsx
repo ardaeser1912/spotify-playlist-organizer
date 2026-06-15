@@ -190,7 +190,12 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
 
         {/* gövde */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {loading && <p className="text-sm text-[var(--dim)]">Önizleme hazırlanıyor…</p>}
+          {loading && (
+            <p className="text-sm text-[var(--dim)]">
+              Önizleme hazırlanıyor…{' '}
+              <span className="text-[var(--faint)]">(büyük kütüphanelerde Spotify’dan çekmek birkaç saniye sürebilir)</span>
+            </p>
+          )}
           {error && (isForbidden
             ? (
               <div className="surface px-4 py-3 text-sm text-[var(--dim)]">
@@ -294,8 +299,21 @@ function Preview({ kind, data }) {
     )
   }
   // 'tracks'
+  // Akıllı Mix: data.groups varsa türe-göre küme özetini parça listesinin üstünde göster.
+  const groups = Array.isArray(data.groups)
+    ? [...data.groups].sort((a, b) => (b.count || 0) - (a.count || 0))
+    : null
   return (
     <>
+      {groups && groups.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {groups.map((g) => (
+            <span key={g.bucket || g.label} className="chip">
+              {g.bucket || g.label} <span className="mono text-[var(--faint)]">{g.count}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <p className="text-sm text-[var(--dim)] mb-3">{data.tracks.length} parça · yeni sıra:</p>
       <TrackList tracks={data.tracks} />
     </>
