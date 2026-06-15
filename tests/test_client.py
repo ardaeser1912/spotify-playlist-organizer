@@ -252,6 +252,25 @@ def test_playlists_maps_track_count():
     ]
 
 
+def test_playlists_real_world_quirks():
+    # Gerçek API (canlı hesapla yakalandı): takip edilen listelerde tracks=None,
+    # bazı öğeler None, isim eksik olabilir. track_count yanlış 0 değil, None olmalı.
+    p1 = _page([
+        {"id": "pl1", "name": "Takip Edilen", "tracks": None},          # bilinmeyen sayı
+        {"id": "pl2", "name": "Eksik Tracks"},                          # 'tracks' anahtarı yok
+        None,                                                           # null öğe → atlanır
+        {"id": "pl3", "tracks": {"total": 7}},                          # isim yok
+        {"name": "ID yok"},                                            # id yok → atlanır
+    ])
+    fake = FakeSpotify(pages={"current_user_playlists": [p1]})
+    res = SpotipyClient(fake).playlists()
+    assert res == [
+        {"id": "pl1", "name": "Takip Edilen", "track_count": None},
+        {"id": "pl2", "name": "Eksik Tracks", "track_count": None},
+        {"id": "pl3", "name": "(isimsiz)", "track_count": 7},
+    ]
+
+
 # =============================================================================
 # playlist_tracks — episode/None atlanır + additional_types doğrulama
 # =============================================================================

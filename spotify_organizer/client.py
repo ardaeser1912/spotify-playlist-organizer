@@ -93,9 +93,16 @@ class SpotipyClient:
         return items
 
     def playlists(self) -> list[dict]:
-        items = self._paginate(self.sp.current_user_playlists(limit=_PAGE))
-        return [{"id": p["id"], "name": p["name"], "track_count": p["tracks"]["total"]}
-                for p in items if p]
+        # Gerçek API None öğe / eksik 'tracks' / eksik 'name' döndürebilir (editöryel listeler) → savunmacı oku.
+        out = []
+        for p in self._paginate(self.sp.current_user_playlists(limit=_PAGE)):
+            if not p or not p.get("id"):
+                continue
+            # Takip edilen (başkasının) listelerde /me/playlists 'tracks'ı None döndürebilir →
+            # yanlış 0 yerine None (UI '—' gösterir; gerçek sayı liste açılınca gelir).
+            total = (p.get("tracks") or {}).get("total")
+            out.append({"id": p["id"], "name": p.get("name") or "(isimsiz)", "track_count": total})
+        return out
 
     def playlist_tracks(self, playlist_id: str) -> list[dict]:
         items = self._paginate(self.sp.playlist_items(playlist_id, limit=100,

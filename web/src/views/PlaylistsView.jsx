@@ -43,7 +43,7 @@ export default function PlaylistsView() {
             }`}
           >
             <div className="truncate font-medium text-[0.95rem]">{p.name}</div>
-            <div className="mono text-xs text-[var(--faint)]">{p.track_count} parça</div>
+            <div className="mono text-xs text-[var(--faint)]">{typeof p.track_count === 'number' ? `${p.track_count} parça` : '—'}</div>
           </button>
         ))}
       </div>
