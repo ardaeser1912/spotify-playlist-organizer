@@ -87,6 +87,11 @@ Geriye Şef'e bağlı: GetSongBPM key (DJ/BPM için) · GitHub push.
 - (p4) **İçgörüler 13 ince türle taşma/sıra kontrolü** + responsive/mobil + motion cilası.
 - (p5) Görsel QA her turda; pytest+build yeşil; küçük commit; PUSH YOK.
 
+## ✅ UI/UX LOOP DURUMU (15 Haz) — 274 test
+- **p1✅** Beğenilenler kitaplıkta · **p2✅** gerçek modda Dışa Aktar birincil · **p3✅** Akıllı Mix küme chip'leri + yavaş ipucu · **p4✅** İçgörüler 13-tür azalan sıra+scroll+responsive+motion. DEMO görsel QA TEMİZ (9 araç + içgörüler, konsol hatası yok).
+- **🔴🔧 SPOTIFY RATE-LIMIT (kritik, çözüldü):** Yoğun gerçek-hesap testleri (979×20-sayfa×onlarca-kez) → Spotify ~13 SAAT limit koydu (retry 48381s), backend takıldı (me:000). ÇÖZÜM: spotipy retries=0+timeout (hızlı fail), _run 429→net mesaj, **CachingClient** (liked/playlists diske TTL-cache 30dk, yazmada invalidate, /api/refresh). Gerçek panel limit kalkınca CACHE sayesinde HIZLI+güvenli. Commit `4fa896a`. **DERS: gerçek-hesap QA'sını DEMO'da yap (DEMO=1, Spotify çağrısı yok); gerçeği hammer'lama.**
+- Bundan sonra tüm geliştirme/görsel-QA DEMO modunda. Gerçek hesap testi sadece limit kalkınca.
+
 ## 🟡 Şef kararı / doğrulama bekleyenler
 - **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.
 - **Tür kova önceliği:** Arabesk > Hip-Hop > Elektronik > R&B > Rock > Pop (ilk eşleşen kazanır). DEMO'da doğru görünüyor; gerçek kütüphanende tuhaf bir eşleme olursa `genre.py` tablosuna kova/anahtar ekleriz.
