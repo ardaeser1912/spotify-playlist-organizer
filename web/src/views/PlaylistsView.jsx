@@ -19,10 +19,10 @@ export default function PlaylistsView() {
   }, [])
 
   function open(id) {
-    setSelected(id); setDetail(null); setDetailLoading(true); setModal(null)
+    setSelected(id); setDetail(null); setDetailLoading(true); setModal(null); setError(null)
     api(`/api/playlist/${id}`)
       .then((r) => setDetail(r.data))
-      .catch(() => setError('Playlist yüklenemedi'))
+      .catch(() => setError('Bu liste açılamadı — Spotify, geliştirici-modunda bazı takip-edilen listeleri kısıtlıyor. Beğenilenler ve kendi listelerin çalışır.'))
       .finally(() => setDetailLoading(false))
   }
 
