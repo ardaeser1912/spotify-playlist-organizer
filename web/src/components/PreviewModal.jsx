@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { api, post, fmtDuration, camelotColor } from '../lib/api'
+import { api, post, fmtDuration, camelotColor, camelotCompatible } from '../lib/api'
 import AlbumArt from './AlbumArt'
 
 /**
@@ -316,31 +316,61 @@ function Preview({ kind, data }) {
         </div>
       )}
       <p className="text-sm text-[var(--dim)] mb-3">{data.tracks.length} parça · yeni sıra:</p>
-      <TrackList tracks={data.tracks} />
+      <TrackList tracks={data.tracks} kind="tracks" />
     </>
   )
 }
 
-function TrackList({ tracks, muted }) {
+function TrackList({ tracks, muted, kind }) {
+  // Geçiş göstergesi yalnızca akış sıralamasında (Geçişli Sırala / Akıllı Mix) ve
+  // listede en az bir camelot/bpm varken — dedupe/groups'ta gösterme.
+  const showTransitions = kind === 'tracks'
+    && tracks.some((t) => t.camelot || t.bpm)
   return (
     <ol className="surface overflow-hidden">
       {tracks.map((t, i) => (
-        <li key={t.id + '-' + i}
-            className={`flex items-center gap-3 px-4 py-2 border-b border-[var(--border)] last:border-0 ${muted ? 'opacity-60' : ''}`}>
-          <span className="mono w-6 text-right text-xs text-[var(--faint)]">{i + 1}</span>
-          <AlbumArt src={t.image} alt={t.title} size={40} />
-          <div className="flex-1 min-w-0">
-            <div className="truncate text-sm">{t.title}</div>
-            <div className="truncate text-xs text-[var(--dim)]">{t.artist}</div>
-          </div>
-          {t.camelot && (
-            <span className="chip text-black/85" style={{ background: camelotColor(t.camelot) }}>{t.camelot}</span>
-          )}
-          {t.bpm && <span className="mono text-xs text-[var(--dim)] w-14 text-right">{t.bpm} BPM</span>}
-          <span className="mono text-xs text-[var(--faint)] w-10 text-right">{fmtDuration(t.duration_ms)}</span>
-        </li>
+        <Fragment key={t.id + '-' + i}>
+          {showTransitions && i > 0 && <TransitionRow a={tracks[i - 1]} b={t} />}
+          <li className={`flex items-center gap-3 px-4 py-2 border-b border-[var(--border)] last:border-0 ${muted ? 'opacity-60' : ''}`}>
+            <span className="mono w-6 text-right text-xs text-[var(--faint)]">{i + 1}</span>
+            <AlbumArt src={t.image} alt={t.title} size={40} />
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-sm">{t.title}</div>
+              <div className="truncate text-xs text-[var(--dim)]">{t.artist}</div>
+            </div>
+            {t.camelot && (
+              <span className="chip text-black/85" style={{ background: camelotColor(t.camelot) }}>{t.camelot}</span>
+            )}
+            {t.bpm && <span className="mono text-xs text-[var(--dim)] w-14 text-right">{t.bpm} BPM</span>}
+            <span className="mono text-xs text-[var(--faint)] w-10 text-right">{fmtDuration(t.duration_ms)}</span>
+          </li>
+        </Fragment>
       ))}
     </ol>
+  )
+}
+
+// İki ardışık parça arasındaki DJ geçiş kalitesi — diskret, satır akışını bozmayan ince rozet.
+function TransitionRow({ a, b }) {
+  const hasKeys = a.camelot && b.camelot
+  const compatible = hasKeys && camelotCompatible(a.camelot, b.camelot)
+  const bpmDelta = (a.bpm != null && b.bpm != null) ? Math.abs(a.bpm - b.bpm) : null
+  if (!hasKeys && bpmDelta == null) return null // gösterilecek bilgi yok
+  return (
+    <li className="flex items-center gap-2 pl-12 pr-4 py-0.5 border-b border-[var(--border)] select-none"
+        aria-hidden="true">
+      {hasKeys && (
+        <span className="chip"
+              style={compatible
+                ? { color: 'var(--teal)', background: 'rgba(52,216,196,0.10)' }
+                : { color: 'var(--faint)', background: 'rgba(255,255,255,0.03)' }}>
+          ⟶ {compatible ? 'uyumlu' : 'geçiş'}
+        </span>
+      )}
+      {bpmDelta != null && (
+        <span className="mono text-[0.66rem] text-[var(--faint)]">Δ{bpmDelta} BPM</span>
+      )}
+    </li>
   )
 }
 
