@@ -1,38 +1,173 @@
-"""Flask backend.
+"""Flask backend — DEMO + servis endpoint'leri.
 
-DEMO=1 iken fixture verisi döner (auth gerekmez). DEMO olmadan gerçek Spotify
-client'ı kullanılır (loop client.py + endpoint'leri doldurur).
+DEMO=1 iken DemoClient (fixtures, auth gerekmez). DEMO olmadan SpotipyClient
+(auth.py'nin ürettiği token cache; CERRAH modunda loop ÇALIŞTIRMAZ).
 
-Frontend (Vite) dev'de /api'yi buraya proxy'ler → CORS gerekmez.
+Tüm cevaplar tutarlı zarf: {success, data, error}. Mutasyon yalnızca .../apply
+uçlarında ve servis ÖNCE backup alır.
+
 Çalıştır:  DEMO=1 python -m spotify_organizer.app   (varsayılan port 5055)
 """
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
-from . import fixtures
+from .service import OrganizerService
 
 app = Flask(__name__)
-DEMO = os.environ.get("DEMO") == "1"
 
 
+def _demo() -> bool:
+    return os.environ.get("DEMO") == "1"
+
+
+def _service() -> OrganizerService:
+    if _demo():
+        from .demo_client import DemoClient
+        return OrganizerService(DemoClient())
+    # Gerçek mod: spotipy (auth.py token cache). Loop CERRAH'ta buraya GİRMEZ.
+    import spotipy
+    from spotipy.oauth2 import SpotifyOAuth
+    from .client import SpotipyClient
+    sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+        scope="playlist-read-private playlist-read-collaborative playlist-modify-public "
+              "playlist-modify-private user-library-read user-top-read",
+        redirect_uri="http://127.0.0.1:8888/callback", open_browser=False))
+    return SpotipyClient(sp)
+
+
+def _ok(data):
+    return jsonify({"success": True, "data": data, "error": None})
+
+
+def _err(msg, code=400):
+    return jsonify({"success": False, "data": None, "error": str(msg)}), code
+
+
+def _run(fn):
+    """Body'yi al, servisi kur, fn(svc, body) çalıştır, zarfla + hata yakala."""
+    body = request.get_json(silent=True) or {}
+    try:
+        svc = _service()
+    except Exception as e:  # noqa: BLE001 — gerçek modda auth eksikse temiz hata
+        return _err(f"istemci kurulamadı (auth gerekli olabilir): {e}", 401)
+    try:
+        return _ok(fn(svc, body))
+    except Exception as e:  # noqa: BLE001
+        return _err(e, 400)
+
+
+# ---------- temel okuma ----------
 @app.get("/api/me")
 def me():
-    return jsonify({"display_name": "Demo Kullanıcı" if DEMO else "—", "demo": DEMO})
+    return jsonify({"display_name": "Demo Kullanıcı" if _demo() else "—", "demo": _demo()})
 
 
 @app.get("/api/playlists")
 def playlists():
-    data = fixtures.playlists_summary() if DEMO else []
-    return jsonify({"success": True, "data": data, "error": None})
+    return _run(lambda s, b: s.client.playlists())
 
 
 @app.get("/api/playlist/<pid>")
 def playlist(pid):
-    pl = fixtures.get_playlist(pid) if DEMO else None
-    if not pl:
-        return jsonify({"success": False, "data": None, "error": "playlist bulunamadı"}), 404
-    return jsonify({"success": True, "data": pl, "error": None})
+    def fn(s, b):
+        tracks = s.client.playlist_tracks(pid)
+        if not tracks:
+            raise ValueError("playlist bulunamadı")
+        return {"id": pid, "name": s._name_for(pid), "tracks": tracks}
+    return _run(fn)
+
+
+# ---------- türe göre ayır ----------
+@app.post("/api/split-genre/preview")
+def split_genre_preview():
+    return _run(lambda s, b: s.preview_split_genre(b.get("source", "liked")))
+
+
+@app.post("/api/split-genre/apply")
+def split_genre_apply():
+    return _run(lambda s, b: s.apply_split_genre(b.get("source", "liked")))
+
+
+# ---------- geçişli sırala (DJ) ----------
+@app.post("/api/order/preview")
+def order_preview():
+    return _run(lambda s, b: s.preview_order(b.get("source", "liked")))
+
+
+@app.post("/api/order/apply")
+def order_apply():
+    return _run(lambda s, b: s.apply_order(b.get("source", "liked")))
+
+
+# ---------- tekrar temizle ----------
+@app.post("/api/dedupe/preview")
+def dedupe_preview():
+    return _run(lambda s, b: s.preview_dedupe(b.get("source", "liked")))
+
+
+@app.post("/api/dedupe/apply")
+def dedupe_apply():
+    return _run(lambda s, b: s.apply_dedupe(b.get("source", "liked")))
+
+
+# ---------- çok-anahtarlı sırala ----------
+@app.post("/api/sort/preview")
+def sort_preview():
+    return _run(lambda s, b: s.preview_sort(b.get("source", "liked"), b.get("keys", [])))
+
+
+@app.post("/api/sort/apply")
+def sort_apply():
+    return _run(lambda s, b: s.apply_sort(b.get("source", "liked"), b.get("keys", [])))
+
+
+# ---------- birleştir ----------
+@app.post("/api/merge/preview")
+def merge_preview():
+    return _run(lambda s, b: s.preview_merge(b.get("sources", [])))
+
+
+@app.post("/api/merge/apply")
+def merge_apply():
+    return _run(lambda s, b: s.apply_merge(b.get("sources", []), b.get("name", "")))
+
+
+# ---------- böl ----------
+@app.post("/api/split/preview")
+def split_preview():
+    return _run(lambda s, b: s.preview_split(b.get("source", "liked"), b.get("by", "decade"), b.get("size")))
+
+
+@app.post("/api/split/apply")
+def split_apply():
+    return _run(lambda s, b: s.apply_split(b.get("source", "liked"), b.get("by", "decade"), b.get("size")))
+
+
+# ---------- içgörüler / keşif / yedekler ----------
+@app.get("/api/insights/<source>")
+def insights(source):
+    return _run(lambda s, b: s.insights(source))
+
+
+@app.get("/api/top")
+def top():
+    return _run(lambda s, b: s.top())
+
+
+@app.post("/api/search")
+def search():
+    return _run(lambda s, b: s.search(b.get("query", "")))
+
+
+@app.get("/api/backups")
+def backups():
+    return _run(lambda s, b: s.list_backups())
+
+
+@app.post("/api/restore")
+def restore():
+    return _run(lambda s, b: s.restore(b.get("file", "")))
 
 
 def main():
