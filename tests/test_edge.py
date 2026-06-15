@@ -246,3 +246,17 @@ def test_given_unknown_sources_when_preview_merge_then_empty(tmp_path):
 def test_given_unknown_source_when_preview_split_size_then_empty_groups(tmp_path):
     out = _svc(tmp_path).preview_split("p_yok", "size", size=5)
     assert out["groups"] == []
+
+
+# ============================================================
+# insights: popularity=None — TypeError ATMAMALI (Hızlı Zenco bulgusu)
+# ============================================================
+
+def test_given_none_popularity_when_insights_then_no_typeerror():
+    tracks = [
+        {"id": "x1", "title": "A", "artist": "S", "popularity": None, "year": 2020, "bpm": 120},
+        {"id": "x2", "title": "B", "artist": "S", "popularity": 80, "year": 2021, "bpm": 100},
+    ]
+    ins = organize.insights(tracks)
+    assert ins["total"] == 2
+    assert ins["avg_popularity"] == 40.0  # (0 + 80) / 2

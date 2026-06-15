@@ -47,7 +47,9 @@ cd web && npm run dev
 - Tümü branch `loop/v1`'de küçük commit'lerle (PUSH YOK). Gerçek API/auth ÇAĞRILMADI (CERRAH).
 
 ## 🛡️ Sertleştirme loop'u (Şef "güvenli hardening" seçti, paralel ajanlar)
-- **Tur 1:** +33 edge-case testi (boş/tek/None/sınır/eksik-dosya → toplam **130 test**, crash bulunmadı, hepsi zaten sağlamdı) · PreviewModal a11y (role=dialog/aria-modal, Escape ile kapat, focus-trap + odak iadesi) · shell/nav a11y (aria-label, aria-current, ikon aria-hidden). Build temiz.
+- **Tur 1:** +33 edge-case testi (boş/tek/None/sınır/eksik-dosya → toplam **130 test**, crash bulunmadı) · PreviewModal a11y (role=dialog/aria-modal, Escape ile kapat, focus-trap + odak iadesi) · shell/nav a11y (aria-label, aria-current, ikon aria-hidden). Build temiz.
+- **Tur 2:** (c) frontend durumları DENETLENDİ → 4 view'da loading/error/empty ZATEN tam (F3'te yapılmış), gold-plating yapılmadı · (d) PERFORMANS ölçüldü: organize işlemleri 5000 track'te <3ms; `harmonic_order` O(n²) ama 5000'de **407ms (<1.5s)** → kod değişmedi, **7 perf guard testi** eklendi · (e) README'ye "🖥️ Ekran akışı" bölümü · **BONUS bug fix:** `organize.insights()` `popularity=None` olunca TypeError atıyordu (Hızlı Zenco buldu) → `(t.get('popularity') or 0)` + regresyon testi. **Toplam 138 test yeşil.**
+- **🏁 LOOP DURDU:** sertleştirme backlog'unun (a–e) hepsi tamam; geriye kalanlar Şef'e bağlı (aşağıdaki 3 karar + Backlog). Gereksiz gold-plating yapılmadı (Simplicity First).
 
 ## 🟡 Şef kararı / doğrulama bekleyenler
 - **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.

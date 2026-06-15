@@ -148,8 +148,9 @@ def insights(tracks: list[dict], genre_labels: dict | None = None) -> dict:
     top_artists = [[name, count] for name, count in artist_counter.most_common(5)]
 
     if total:
+        # popularity anahtarı var ama None olabilir → `or 0` ile güvenli (get default'u None'u yakalamaz)
         avg_popularity = round(
-            sum(t.get("popularity", 0) for t in tracks) / total, 1
+            sum((t.get("popularity") or 0) for t in tracks) / total, 1
         )
     else:
         avg_popularity = 0.0

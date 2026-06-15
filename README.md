@@ -20,6 +20,21 @@ Her işlem önce **Önizle**, sonra onaylı **Uygula** — apply öncesi kaynak 
 (hep YENİ playlist). **Beğenilenler reorder edilmez** — kopya playlist üretilir. Her yedek
 **Yedekler** ekranından tek tıkla geri yüklenir.
 
+## 🖥️ Ekran akışı
+Panel dört ekrandan oluşur (sol kenar çubuğundan geçilir):
+
+- **Playlist'ler** — kitaplıktan bir liste seç → parçalar listelenir (Camelot çipi + BPM +
+  süre). Üstte 3 hızlı aksiyon: **Türe Ayır · Geçişli Sırala · Tekrar Temizle** — her biri
+  Önizle→Uygula modalını açar.
+- **Araçlar** — 8 aracın tek vitrini. Bir karta tıkla → konfig paneli açılır (kaynak liste /
+  sıralama alanı / bölme ölçütü gibi seçimler) → **Önizle**'ye bas → modal'da onayla.
+- **İçgörüler** — bir kaynak seç → tür / BPM / on-yıl dağılımı, en çok dinlenen sanatçılar ve
+  ortalama popülerlik gösterilir.
+- **Yedekler** — her "Uygula" öncesi alınan yedekler listelenir → tek tıkla **Geri Al**.
+
+**Önizle→Uygula modalı:** her mutasyon önce önizlenir; "uygulama geri dönüşü zordur" uyarısı +
+otomatik yedek hatırlatması gösterilir. Esc veya ✕ ile kapanır (odak yönetimli, erişilebilir).
+
 ## ▶️ Çalıştırma (DEMO — auth gerekmez)
 ```bash
 python -m venv .venv && source .venv/bin/activate
