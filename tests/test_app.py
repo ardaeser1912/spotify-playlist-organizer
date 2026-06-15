@@ -69,6 +69,18 @@ def test_top_ve_search(client):
     assert any("Tarkan" in t["artist"] for t in hits)
 
 
+def test_service_gercek_modda_organizer_service_doner(monkeypatch):
+    # Regresyon: gerçek mod ÇIPLAK SpotipyClient değil, OrganizerService dönmeli.
+    monkeypatch.delenv("DEMO", raising=False)
+    import spotipy
+    from spotipy import oauth2
+    monkeypatch.setattr(oauth2, "SpotifyOAuth", lambda **k: object())
+    monkeypatch.setattr(spotipy, "Spotify", lambda **k: object())
+    from spotify_organizer import app as appmod
+    from spotify_organizer.service import OrganizerService
+    assert isinstance(appmod._service(), OrganizerService)
+
+
 def test_discover_apply_olusturur(client):
     res = _data(client.post("/api/discover/apply", json={"kind": "search", "query": "tarkan", "name": "T"}))
     assert res["created"][0]["count"] >= 1

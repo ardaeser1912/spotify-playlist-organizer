@@ -38,5 +38,16 @@ cd web && npm run dev
 İlk denemede **Önizle** ile bak, iyiyse **Uygula** (otomatik yedek alır).
 
 ---
-## 🟡 Şef kararı bekleyenler (loop buraya yazar)
-- (loop doldurur)
+## ✅ Loop ne yaptı (F1–F6 BİTTİ, 15 Haz gece)
+- **F1** çekirdek motor: genre / order(Camelot) / enrich(GetSongBPM) / organize — saf Python + mock.
+- **F2** servis (önizle/uygula + backup/restore) + 21 Flask endpoint + DemoClient.
+- **F3+F4** 4 ekran canlı bağlandı (PreviewModal önizle→uygula, güvenlik uyarısı, yedek özeti); İçgörüler canlı grafikler; Yedekler + Geri Al.
+- **F5** doğrulama: **97 pytest yeşil** + `npm run build` temiz + **7 ekran headless-chromium ile görsel doğrulandı, konsol hatası yok**.
+- **F6** README + bu dosya + `auth.py` (tek seferlik OAuth) yazıldı.
+- Tümü branch `loop/v1`'de küçük commit'lerle (PUSH YOK). Gerçek API/auth ÇAĞRILMADI (CERRAH).
+
+## 🟡 Şef kararı / doğrulama bekleyenler
+- **GetSongBPM `open_key`→Camelot eşlemesi BELGELENMİŞ VARSAYIM.** Gerçek key ile (`enrich.build_getsongbpm_fetch`) bir-iki şarkıda tempo+key dönüşünü teyit et; alan adı (`open_key`/`key_of`) farklıysa `enrich.open_key_to_camelot`'u ayarla. Mock testler şekilden bağımsız geçiyor.
+- **Tür kova önceliği:** Arabesk > Hip-Hop > Elektronik > R&B > Rock > Pop (ilk eşleşen kazanır). DEMO'da doğru görünüyor; gerçek kütüphanende tuhaf bir eşleme olursa `genre.py` tablosuna kova/anahtar ekleriz.
+- **Beğenilenler'i gerçekten silme/azaltma** istemiyoruz: dedupe/sort/order Beğenilenler'de hep KOPYA üretir (kilitli karar #6). Normal playlist'lerde `replace` ile yerinde günceller (önce yedek). Bu davranışı onaylıyor musun?
+- (Backlog — loop YAPMADI: gerçek deploy, mood/enerji boyutu, dev-mode 25-kişi aşımı.)

@@ -28,12 +28,13 @@ def _service() -> OrganizerService:
     # Gerçek mod: spotipy (auth.py token cache). Loop CERRAH'ta buraya GİRMEZ.
     import spotipy
     from spotipy.oauth2 import SpotifyOAuth
-    from .client import SpotipyClient
+    from .client import REDIRECT_URI, SCOPES, SpotipyClient
+    from .enrich import build_getsongbpm_fetch
     sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
-        scope="playlist-read-private playlist-read-collaborative playlist-modify-public "
-              "playlist-modify-private user-library-read user-top-read",
-        redirect_uri="http://127.0.0.1:8888/callback", open_browser=False))
-    return SpotipyClient(sp)
+        scope=SCOPES, redirect_uri=os.environ.get("SPOTIPY_REDIRECT_URI", REDIRECT_URI),
+        cache_path=".spotify_cache", open_browser=False))
+    fetch = build_getsongbpm_fetch(os.environ.get("GETSONGBPM_API_KEY", ""))
+    return OrganizerService(SpotipyClient(sp), bpm_fetch=fetch)
 
 
 def _ok(data):

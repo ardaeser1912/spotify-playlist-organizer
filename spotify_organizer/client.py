@@ -38,6 +38,11 @@ class SpotifyClient(Protocol):
 # Spotify sanatçı genres → bizim Track'te yok; ayrı çağrı. Sayfa limiti 50.
 _PAGE = 50
 
+# OAuth ayarları — app.py + auth.py ortak kullanır (tek kaynak). Kilitli karar #7.
+SCOPES = ("playlist-read-private playlist-read-collaborative playlist-modify-public "
+          "playlist-modify-private user-library-read user-top-read")
+REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
 
 def _normalize_track(item: dict) -> dict | None:
     """spotipy track objesi → normalize Track. Episode/None öğeleri atlar."""
