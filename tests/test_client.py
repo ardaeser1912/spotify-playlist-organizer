@@ -362,6 +362,18 @@ def test_artist_genres_returns_dict():
     assert res == {"a1": ["pop", "dance"]}
 
 
+def test_artist_genres_403_olunca_zarif_atlar():
+    # Gerçek: Spotify Development-mode /artists 403 döndürüyor → batch atlanır, çökme yok.
+    fake = FakeSpotify(artists=[])
+
+    def boom(ids):
+        raise Exception("http status: 403 Forbidden")
+
+    fake.artists = boom
+    res = SpotipyClient(fake).artist_genres(["a1", "a2"])
+    assert res == {}  # tür bilgisi yok ama panel çökmedi
+
+
 # =============================================================================
 # top_tracks / top_artists
 # =============================================================================

@@ -61,7 +61,13 @@ def _run(fn):
 # ---------- temel okuma ----------
 @app.get("/api/me")
 def me():
-    return jsonify({"display_name": "Demo Kullanıcı" if _demo() else "—", "demo": _demo()})
+    if _demo():
+        return jsonify({"display_name": "Demo Kullanıcı", "demo": True})
+    try:
+        name = _service().client.current_user().get("display_name", "—")
+    except Exception:  # noqa: BLE001 — auth yoksa panel yine açılsın
+        name = "—"
+    return jsonify({"display_name": name, "demo": False})
 
 
 @app.get("/api/playlists")

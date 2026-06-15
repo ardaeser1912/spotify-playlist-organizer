@@ -119,7 +119,12 @@ class SpotipyClient:
         out: dict[str, list[str]] = {}
         uniq = [a for a in dict.fromkeys(artist_ids) if a]
         for i in range(0, len(uniq), _PAGE):
-            res = self.sp.artists(uniq[i:i + _PAGE]) or {}
+            # /artists, Development-mode app'lerde 403 dönebilir (Spotify 2025 metadata kısıtı).
+            # Tür bilgisi olmadan da panel ayakta kalsın → bu batch'i atla, çökme.
+            try:
+                res = self.sp.artists(uniq[i:i + _PAGE]) or {}
+            except Exception:  # noqa: BLE001 — 403/ağ → tür bilgisiz devam
+                continue
             for a in res.get("artists", []):
                 if a:
                     out[a["id"]] = a.get("genres", [])
