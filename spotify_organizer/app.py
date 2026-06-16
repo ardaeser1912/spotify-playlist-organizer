@@ -10,7 +10,7 @@ uçlarında ve servis ÖNCE backup alır.
 """
 import os
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from .service import OrganizerService
 
@@ -247,6 +247,39 @@ def preview():
         except Exception:  # noqa: BLE001 — önizleme bulunamazsa çalar parçayı atlar
             cache[key] = None
     return _ok({"url": cache.get(key)})
+
+
+@app.get("/api/preview-audio")
+def preview_audio():
+    """Önizleme sesini SUNUCUDAN aynı-origin akıtır (Web Audio decodeAudioData CORS ister;
+    Deezer/iTunes CDN cross-origin fetch'e izin vermeyebilir → proxy şart). DJ Modu beatmatch
+    crossfade için ham ses gerekir. URL'i preview cache'ten alır, baytları audio/mpeg döndürür."""
+    from . import audio_bpm, enrich
+    import urllib.request
+    artist = request.args.get("artist", "")
+    title = request.args.get("title", "")
+    if not (artist or title):
+        return _err("artist/title gerekli", 400)
+    os.makedirs("cache", exist_ok=True)
+    cache = enrich.load_cache(_PREVIEW_CACHE)
+    key = enrich._cache_key(title, artist)
+    if key not in cache:
+        try:
+            cache[key] = audio_bpm.preview_lookup(artist, title)
+            enrich.save_cache(_PREVIEW_CACHE, cache)
+        except Exception:  # noqa: BLE001
+            cache[key] = None
+    url = cache.get(key)
+    if not url:
+        return _err("önizleme bulunamadı", 404)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "SpotifyPlaylistOrganizer/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = r.read()
+    except Exception:  # noqa: BLE001
+        return _err("önizleme indirilemedi", 502)
+    return Response(data, mimetype="audio/mpeg",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.post("/api/refresh")

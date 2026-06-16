@@ -161,3 +161,31 @@ def test_preview_lookup_deezer_sonra_itunes(monkeypatch):
     monkeypatch.setattr(audio_bpm, "_deezer_search_one", lambda q: None)
     monkeypatch.setattr(audio_bpm, "itunes_preview", lambda a, t: "http://it.mp3")
     assert audio_bpm.preview_lookup("X", "Y") == "http://it.mp3"
+
+
+def test_preview_audio_baytlari_akitir(client, monkeypatch, tmp_path):
+    import urllib.request
+    import spotify_organizer.app as appmod
+    from spotify_organizer import audio_bpm
+    monkeypatch.setattr(audio_bpm, "preview_lookup", lambda a, t: "https://cdn/x.mp3")
+    monkeypatch.setattr(appmod, "_PREVIEW_CACHE", str(tmp_path / "p.json"))
+
+    class _FakeHTTP:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b"ID3FAKEMP3BYTES"
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=15: _FakeHTTP())
+    r = client.get("/api/preview-audio?artist=Quavo&title=Tough")
+    assert r.status_code == 200
+    assert r.mimetype == "audio/mpeg"
+    assert r.data == b"ID3FAKEMP3BYTES"
+
+
+def test_preview_audio_yoksa_404(client, monkeypatch, tmp_path):
+    import spotify_organizer.app as appmod
+    from spotify_organizer import audio_bpm
+    monkeypatch.setattr(audio_bpm, "preview_lookup", lambda a, t: None)
+    monkeypatch.setattr(appmod, "_PREVIEW_CACHE", str(tmp_path / "p.json"))
+    r = client.get("/api/preview-audio?artist=Yok&title=Yok")
+    assert r.status_code == 404

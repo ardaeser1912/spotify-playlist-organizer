@@ -4,149 +4,180 @@ import { camelotColor, camelotCompatible } from '../lib/api'
 import AlbumArt from './AlbumArt'
 
 /**
- * DJ Modu — sıralı parçaları (Geçişli Sırala / Akıllı Mix çıktısı) 30sn önizlemelerle
- * art arda çalar, her geçişte iki deck arasında CROSSFADE yapar ve geçiş kalitesini
- * (Camelot uyumu + Δ BPM) CANLI gösterir. Önizleme /api/preview'dan (Deezer→iTunes) gelir;
- * Spotify'a dokunmaz. Önizlemesi olmayan parça otomatik atlanır.
+ * DJ Modu — GERÇEK beatmatch + crossfade (Web Audio API).
+ * Geçişte: giden parça tempo'sunu (playbackRate) sonrakinin BPM'ine RAMPLA yavaşlatır/hızlandırır
+ * (vinil pitch-fader gibi) + iki parça ÜST ÜSTE binerek gain ile crossfade olur → "ilk şarkı
+ * yavaşlar, BPM uyar, diğeri yavaşça gelir". Ham ses /api/preview-audio'dan aynı-origin gelir
+ * (decodeAudioData CORS ister). Önizlemesi olmayan parça atlanır, sonraki ön-decode edilir.
  *
  * Props: open, tracks (sıralı [{id,title,artist,image,bpm,camelot}]), onClose
  */
-const CROSSFADE_SEC = 4
-const TICK_MS = 50
+const BLEND_SEC = 7       // geçiş süresi (crossfade + beatmatch)
+const SKIP_BLEND = 2.5    // "Geç" ile hızlı ama yine de yumuşak
+
+// BPM oranını müzikal aralığa katla (yarı/çift tempo) → aşırı pitch bozulması olmasın.
+function beatmatchRatio(fromBpm, toBpm) {
+  if (!fromBpm || !toBpm) return 1
+  let r = toBpm / fromBpm
+  while (r < 0.7) r *= 2
+  while (r > 1.43) r /= 2
+  return r
+}
 
 export default function DjPlayer({ open, tracks = [], onClose }) {
   const [idx, setIdx] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(0) // 0..1 (mevcut deck)
+  const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
-  const [fading, setFading] = useState(false)
+  const [blending, setBlending] = useState(false)
 
-  const deckA = useRef(null)
-  const deckB = useRef(null)
-  const curDeck = useRef(0) // 0=A, 1=B (CURRENT parçayı çalan deck)
+  const ctxRef = useRef(null)
+  const bufRef = useRef(new Map())   // id -> AudioBuffer | null (decode cache)
+  const pendRef = useRef(new Map())  // id -> Promise (uçuşan decode)
+  const curRef = useRef(null)        // {source, gain, bpm, duration, startedAt}
   const idxRef = useRef(0)
-  const urlCache = useRef(new Map()) // track.id -> url|null
-  const fadeTimer = useRef(null)
+  const blendingRef = useRef(false)
+  const blendUntilRef = useRef(0)
   const startedRef = useRef(false)
 
-  const deckEl = (n) => (n === 0 ? deckA.current : deckB.current)
-
-  const fetchUrl = useCallback(async (t) => {
-    if (!t) return null
-    const cache = urlCache.current
-    if (cache.has(t.id)) return cache.get(t.id)
-    try {
-      const qs = new URLSearchParams({ artist: t.artist || '', title: t.title || '' })
-      const r = await fetch(`/api/preview?${qs.toString()}`)
-      const j = await r.json()
-      const url = j?.data?.url || null
-      cache.set(t.id, url)
-      return url
-    } catch {
-      cache.set(t.id, null)
-      return null
+  const getCtx = useCallback(() => {
+    if (!ctxRef.current) {
+      const AC = window.AudioContext || window.webkitAudioContext
+      ctxRef.current = new AC()
     }
+    if (ctxRef.current.state === 'suspended') ctxRef.current.resume()
+    return ctxRef.current
   }, [])
 
-  // Belirli bir parçayı (verili deck'e) yükleyip çal. Önizleme yoksa sonrakine atla.
-  const playTrack = useCallback(async (trackIndex, deck) => {
-    if (trackIndex >= tracks.length) { setPlaying(false); setStatus('Set bitti 🎧'); return }
-    idxRef.current = trackIndex
-    setIdx(trackIndex)
-    setStatus('Önizleme aranıyor…')
-    const url = await fetchUrl(tracks[trackIndex])
-    if (idxRef.current !== trackIndex) return // bu sırada ileri sarıldıysa iptal
-    if (!url) {
-      setStatus(`“${tracks[trackIndex].title}” için önizleme yok — atlanıyor`)
-      return playTrack(trackIndex + 1, deck)
-    }
-    setStatus('')
-    const el = deckEl(deck)
-    if (!el) return
-    el.src = url
-    el.volume = 1
-    curDeck.current = deck
-    try { await el.play(); setPlaying(true) } catch { setPlaying(false) }
-    // sonrakini ön-getir (crossfade gecikmesiz olsun)
-    if (tracks[trackIndex + 1]) fetchUrl(tracks[trackIndex + 1])
-  }, [tracks, fetchUrl])
-
-  // İki deck arası crossfade → sonraki parçaya geç.
-  const crossfadeNext = useCallback(async (fadeSec = CROSSFADE_SEC) => {
-    if (fadeTimer.current) return // zaten geçişte
-    const next = idxRef.current + 1
-    if (next >= tracks.length) {
-      const el = deckEl(curDeck.current)
-      if (el) el.pause()
-      setPlaying(false); setStatus('Set bitti 🎧')
-      return
-    }
-    const url = await fetchUrl(tracks[next])
-    const from = curDeck.current
-    const to = from === 0 ? 1 : 0
-    const fromEl = deckEl(from)
-    const toEl = deckEl(to)
-    if (!url || !toEl) { // önizleme yok → sert atla
-      if (fromEl) fromEl.pause()
-      return playTrack(next, to)
-    }
-    toEl.src = url
-    toEl.volume = 0
-    try { await toEl.play() } catch { /* yok say */ }
-    idxRef.current = next
-    setIdx(next)
-    setFading(true)
-    if (tracks[next + 1]) fetchUrl(tracks[next + 1])
-
-    const steps = Math.max(1, Math.round((fadeSec * 1000) / TICK_MS))
-    let i = 0
-    fadeTimer.current = setInterval(() => {
-      i += 1
-      const r = Math.min(1, i / steps)
-      if (fromEl) fromEl.volume = Math.max(0, 1 - r)
-      toEl.volume = Math.min(1, r)
-      if (r >= 1) {
-        clearInterval(fadeTimer.current); fadeTimer.current = null
-        if (fromEl) { fromEl.pause(); fromEl.currentTime = 0 }
-        curDeck.current = to
-        setFading(false)
+  // Önizleme sesini indir + decode (cache'li). Yoksa null.
+  const getBuffer = useCallback((track) => {
+    if (!track) return Promise.resolve(null)
+    const id = track.id
+    if (bufRef.current.has(id)) return Promise.resolve(bufRef.current.get(id))
+    if (pendRef.current.has(id)) return pendRef.current.get(id)
+    const ctx = getCtx()
+    const promise = (async () => {
+      try {
+        const qs = new URLSearchParams({ artist: track.artist || '', title: track.title || '' })
+        const r = await fetch(`/api/preview-audio?${qs.toString()}`)
+        if (!r.ok) throw new Error('no preview')
+        const ab = await r.arrayBuffer()
+        const buf = await ctx.decodeAudioData(ab)
+        bufRef.current.set(id, buf)
+        return buf
+      } catch {
+        bufRef.current.set(id, null)
+        return null
+      } finally {
+        pendRef.current.delete(id)
       }
-    }, TICK_MS)
-  }, [tracks, fetchUrl, playTrack])
+    })()
+    pendRef.current.set(id, promise)
+    return promise
+  }, [getCtx])
 
-  // mevcut deck ilerleme + bitişe yakın otomatik crossfade
+  // Bir parçayı yeni deck olarak baştan çal (gain fade-in).
+  const startTrack = useCallback(async (trackIndex, fadeIn = 0.5) => {
+    if (trackIndex >= tracks.length) { setPlaying(false); setStatus('Set bitti 🎧'); return }
+    idxRef.current = trackIndex; setIdx(trackIndex)
+    setStatus('Önizleme yükleniyor…')
+    const track = tracks[trackIndex]
+    const buf = await getBuffer(track)
+    if (idxRef.current !== trackIndex) return
+    if (!buf) { setStatus(`“${track.title}” için önizleme yok — atlanıyor`); return startTrack(trackIndex + 1, fadeIn) }
+    setStatus('')
+    const ctx = getCtx()
+    const source = ctx.createBufferSource(); source.buffer = buf
+    const gain = ctx.createGain()
+    source.connect(gain); gain.connect(ctx.destination)
+    const now = ctx.currentTime
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.linearRampToValueAtTime(1, now + fadeIn)
+    source.start(now)
+    curRef.current = { source, gain, bpm: track.bpm, duration: buf.duration, startedAt: now }
+    setPlaying(true)
+    if (tracks[trackIndex + 1]) getBuffer(tracks[trackIndex + 1])  // ön-decode
+  }, [tracks, getBuffer, getCtx])
+
+  // GERÇEK geçiş: beatmatch (tempo rampası) + crossfade (gain) → sonraki parça.
+  const blendNext = useCallback(async (blendSec = BLEND_SEC) => {
+    if (blendingRef.current) return
+    const cur = curRef.current
+    const nextIndex = idxRef.current + 1
+    if (!cur || nextIndex >= tracks.length) return
+    blendingRef.current = true; setBlending(true)
+    const nextTrack = tracks[nextIndex]
+    const buf = await getBuffer(nextTrack)
+    const ctx = getCtx()
+    if (!buf) { // önizleme yok → sert geç (nadiren)
+      try { cur.source.stop() } catch { /* yok say */ }
+      blendingRef.current = false; setBlending(false)
+      return startTrack(nextIndex)
+    }
+    const now = ctx.currentTime
+    const nextSource = ctx.createBufferSource(); nextSource.buffer = buf
+    const nextGain = ctx.createGain()
+    nextSource.connect(nextGain); nextGain.connect(ctx.destination)
+    // gelen: 0 → 1 (yavaşça gelir)
+    nextGain.gain.setValueAtTime(0.0001, now)
+    nextGain.gain.linearRampToValueAtTime(1, now + blendSec)
+    // giden: gain 1 → 0  +  tempo 1 → beatmatch oranı (yavaşlar/hızlanır, BPM uyar)
+    cur.gain.gain.cancelScheduledValues(now)
+    cur.gain.gain.setValueAtTime(cur.gain.gain.value, now)
+    cur.gain.gain.linearRampToValueAtTime(0.0001, now + blendSec)
+    const ratio = beatmatchRatio(cur.bpm, nextTrack.bpm)
+    cur.source.playbackRate.cancelScheduledValues(now)
+    cur.source.playbackRate.setValueAtTime(cur.source.playbackRate.value, now)
+    cur.source.playbackRate.linearRampToValueAtTime(ratio, now + blendSec)
+    nextSource.start(now)
+    try { cur.source.stop(now + blendSec + 0.15) } catch { /* yok say */ }
+    // promote: yeni deck artık "current"
+    curRef.current = { source: nextSource, gain: nextGain, bpm: nextTrack.bpm, duration: buf.duration, startedAt: now }
+    idxRef.current = nextIndex; setIdx(nextIndex)
+    blendUntilRef.current = now + blendSec
+    if (tracks[nextIndex + 1]) getBuffer(tracks[nextIndex + 1])  // bir sonrakini ön-decode
+  }, [tracks, getBuffer, getCtx, startTrack])
+
+  // ilerleme + bitişe yakın otomatik geçiş + blend bayrağını indir (ctx saatiyle → pause-güvenli)
   useEffect(() => {
     if (!open) return
-    const id = setInterval(() => {
-      const el = deckEl(curDeck.current)
-      if (!el || !el.duration || Number.isNaN(el.duration)) return
-      setProgress(el.currentTime / el.duration)
-      const remaining = el.duration - el.currentTime
-      if (!el.paused && remaining <= CROSSFADE_SEC && !fadeTimer.current) {
-        crossfadeNext(Math.min(CROSSFADE_SEC, Math.max(1, remaining)))
+    const iv = setInterval(() => {
+      const ctx = ctxRef.current, cur = curRef.current
+      if (!ctx || !cur) return
+      const elapsed = ctx.currentTime - cur.startedAt
+      setProgress(Math.max(0, Math.min(1, elapsed / cur.duration)))
+      if (blendingRef.current && ctx.currentTime >= blendUntilRef.current) {
+        blendingRef.current = false; setBlending(false)
       }
-    }, 120)
-    return () => clearInterval(id)
-  }, [open, crossfadeNext])
+      if (ctx.state === 'running' && !blendingRef.current
+          && idxRef.current + 1 < tracks.length
+          && cur.duration - elapsed <= BLEND_SEC) {
+        blendNext(Math.min(BLEND_SEC, Math.max(2, cur.duration - elapsed)))
+      }
+    }, 100)
+    return () => clearInterval(iv)
+  }, [open, blendNext, tracks.length])
 
-  // açılışta ilk parçayı başlat; kapanışta her şeyi durdur + sıfırla
+  // açılışta başlat; kapanışta sesi durdur + context'i kapat
   useEffect(() => {
     if (!open) { startedRef.current = false; return }
     if (startedRef.current) return
     startedRef.current = true
-    idxRef.current = 0; setIdx(0); setProgress(0); curDeck.current = 0
-    playTrack(0, 0)
+    idxRef.current = 0; setIdx(0); setProgress(0); blendingRef.current = false
+    startTrack(0, 0.6)
     return () => {
-      if (fadeTimer.current) { clearInterval(fadeTimer.current); fadeTimer.current = null }
-      ;[deckA.current, deckB.current].forEach((el) => { if (el) { el.pause(); el.src = '' } })
+      try { curRef.current?.source?.stop() } catch { /* yok say */ }
+      curRef.current = null
+      if (ctxRef.current) { try { ctxRef.current.close() } catch { /* yok say */ } ctxRef.current = null }
+      bufRef.current.clear(); pendRef.current.clear()
     }
-  }, [open, playTrack])
+  }, [open, startTrack])
 
   function togglePlay() {
-    const el = deckEl(curDeck.current)
-    if (!el) return
-    if (el.paused) { el.play(); if (fadeTimer.current) deckEl(curDeck.current === 0 ? 1 : 0)?.play(); setPlaying(true) }
-    else { el.pause(); deckEl(curDeck.current === 0 ? 1 : 0)?.pause(); setPlaying(false) }
+    const ctx = ctxRef.current
+    if (!ctx) return
+    if (ctx.state === 'running') { ctx.suspend(); setPlaying(false) }
+    else { ctx.resume(); setPlaying(true) }
   }
 
   if (!open) return null
@@ -159,15 +190,12 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
   return createPortal(
     <div className="fixed inset-0 z-[60] grid place-items-center p-4"
          style={{ background: 'rgba(4,4,7,0.78)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
-      <audio ref={deckA} preload="auto" />
-      <audio ref={deckB} preload="auto" />
       <div role="dialog" aria-modal="true" aria-label="DJ Modu"
            className="card reveal w-full max-w-md flex flex-col" style={{ animationDuration: '0.32s' }}
            onClick={(e) => e.stopPropagation()}>
-        {/* başlık */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <div>
-            <div className="text-[0.66rem] tracking-[0.18em] uppercase text-[var(--amber)]">DJ Modu · Geçişli Çal</div>
+            <div className="text-[0.66rem] tracking-[0.18em] uppercase text-[var(--amber)]">DJ Modu · Beatmatch Geçiş</div>
             <h3 className="text-lg">{idx + 1} / {tracks.length}</h3>
           </div>
           <button className="btn btn-ghost px-3 py-1.5" onClick={onClose} aria-label="Kapat">✕</button>
@@ -191,14 +219,13 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
 
           {/* ilerleme */}
           <div className="mt-4 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-2)' }}>
-            <div className="h-full rounded-full transition-[width] duration-150"
-                 style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--amber)' }} />
+            <div className="h-full rounded-full" style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--amber)' }} />
           </div>
           {status && <p className="text-xs text-[var(--faint)] mt-2">{status}</p>}
 
           {/* geçiş kartı → sıradaki */}
           {next && (
-            <div className="mt-5 surface px-4 py-3">
+            <div className="mt-5 surface px-4 py-3" style={blending ? { boxShadow: '0 0 0 1px var(--amber) inset' } : undefined}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="chip" style={compatible
                   ? { color: 'var(--teal)', background: 'rgba(52,216,196,0.12)' }
@@ -206,7 +233,7 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
                   ⟶ {compatible ? 'uyumlu geçiş' : 'geçiş'}
                 </span>
                 {bpmDelta != null && <span className="mono text-[0.7rem] text-[var(--faint)]">Δ{bpmDelta} BPM</span>}
-                {fading && <span className="mono text-[0.7rem] text-[var(--amber)]">crossfade…</span>}
+                {blending && <span className="mono text-[0.7rem] text-[var(--amber)]">⟳ beatmatch + crossfade…</span>}
               </div>
               <div className="flex items-center gap-3 opacity-80">
                 <AlbumArt src={next.image} alt={next.title} size={36} />
@@ -226,13 +253,12 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
             <button className="btn btn-ghost" onClick={togglePlay} aria-label={playing ? 'Duraklat' : 'Çal'}>
               {playing ? '⏸ Duraklat' : '▶ Çal'}
             </button>
-            <button className="btn btn-primary" onClick={() => crossfadeNext(1.2)}
-                    disabled={!next} aria-label="Sıradakine geç">
+            <button className="btn btn-primary" onClick={() => blendNext(SKIP_BLEND)} disabled={!next} aria-label="Sıradakine geç">
               Geç ▶▶
             </button>
           </div>
           <p className="text-[0.66rem] text-[var(--faint)] text-center mt-3">
-            30sn önizlemelerle çalar (Deezer/iTunes) — geçişleri duyman için. Tam şarkı için “Dışa Aktar”.
+            30sn önizlemelerle gerçek beatmatch geçiş — giden parça yavaşlar, BPM uyar, sonraki üstüne biner. Tam şarkı için “Dışa Aktar”.
           </p>
         </div>
       </div>
