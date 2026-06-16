@@ -35,7 +35,7 @@ def main():
     def paced(name, http_get=None):
         nonlocal done
         time.sleep(1.1)  # MusicBrainz ~1 istek/sn ister (User-Agent'lı, bloklamaz)
-        g = genre_source.fetch_musicbrainz_genre(name)
+        g = genre_source.fetch_best_genre(name)  # MB → iTunes → Deezer (niş/underground'u da bulur)
         done += 1
         if done % 25 == 0:
             genre_source.save_cache(CACHE, cache)

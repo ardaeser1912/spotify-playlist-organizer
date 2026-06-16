@@ -30,8 +30,8 @@ def test_bucket_rnb_soul():
     assert genre_source.itunes_to_bucket("R&B/Soul") == "R&B"
 
 
-def test_bucket_jazz_diger():
-    assert genre_source.itunes_to_bucket("Jazz") == "Diğer"
+def test_bucket_jazz():
+    assert genre_source.itunes_to_bucket("Jazz") == "Jazz"
 
 
 def test_bucket_empty_diger():
@@ -86,8 +86,116 @@ def test_bucket_pop_synth():
     assert genre_source.itunes_to_bucket("pop synth-pop") == "Pop"
 
 
-def test_bucket_jazz_diger_genel():
-    assert genre_source.itunes_to_bucket("Jazz") == "Diğer"
+def test_bucket_jazz_genel():
+    assert genre_source.itunes_to_bucket("vocal jazz contemporary jazz") == "Jazz"
+
+
+# --- Dünya/tail kovaları (Reggae/Afrobeat/Latin/Jazz/Blues) + Deezer etiketleri ---
+
+def test_bucket_reggae():
+    assert genre_source.itunes_to_bucket("Reggae") == "Reggae"
+    assert genre_source.itunes_to_bucket("ragga roots reggae") == "Reggae"
+
+
+def test_bucket_afrobeat():
+    assert genre_source.itunes_to_bucket("afrobeat afrobeats") == "Afrobeat"
+    # Deezer Türkçe etiketi "Afrika müziği" de Afrobeat'e düşer
+    assert genre_source.itunes_to_bucket("Afrika müziği") == "Afrobeat"
+
+
+# Çok-türlü sanatçıda BASKIN tür kazanır; minör "reggae" etiketi çalmaz (gerçek regresyonlar)
+def test_tail_minor_tag_calmaz_rolling_stones():
+    assert genre_source.itunes_to_bucket("rock pop blues british uk reggae hard rock") == "Rock"
+
+
+def test_tail_minor_tag_calmaz_temptations():
+    assert genre_source.itunes_to_bucket("pop american funk soul rnb motown soul and reggae") == "R&B"
+
+
+def test_burna_boy_afrobeat_reggae_degil():
+    # Burna Boy: reggae önce yazılı ama Afrobeat baskın → Afrobeat (Reggae'den önce)
+    assert genre_source.itunes_to_bucket("reggae afrobeat english dancehall afrobeats afro fusion") == "Afrobeat"
+
+
+def test_bucket_latin():
+    assert genre_source.itunes_to_bucket("sertanejo latin") == "Latin"
+    assert genre_source.itunes_to_bucket("Brazilian") == "Latin"
+
+
+def test_bucket_blues():
+    assert genre_source.itunes_to_bucket("louisiana blues swamp blues") == "Blues"
+
+
+def test_bucket_rhythm_and_blues_rnb_degil_blues():
+    # "rhythm and blues" Blues değil R&B'dir (R&B önce kazanır)
+    assert genre_source.itunes_to_bucket("rhythm and blues") == "R&B"
+
+
+def test_bucket_deezer_dans_elektronik():
+    # Deezer Türkçe "Dans" → Elektronik
+    assert genre_source.itunes_to_bucket("Dans") == "Elektronik"
+
+
+def test_bucket_deezer_rap_hiphop():
+    # Deezer "Rap/Hip Hop" → Hip-Hop ("trap" değil)
+    assert genre_source.itunes_to_bucket("Rap/Hip Hop") == "Hip-Hop"
+
+
+# --- fetch_deezer_genre: artist → album.genre_id → genre.name (mock) ---
+
+def test_fetch_deezer_genre_zincir():
+    def http_get(url, timeout=None):
+        if "search/artist" in url:
+            return _FakeResp({"data": [{"id": 42}]})
+        if "/artist/42/albums" in url:
+            return _FakeResp({"data": [{"genre_id": 132}]})
+        if "/genre/132" in url:
+            return _FakeResp({"name": "Rap/Hip Hop"})
+        return _FakeResp({})
+    assert genre_source.fetch_deezer_genre("MAZ0", http_get=http_get) == "Rap/Hip Hop"
+
+
+def test_fetch_deezer_genre_artist_yok_none():
+    def http_get(url, timeout=None):
+        return _FakeResp({"data": []})
+    assert genre_source.fetch_deezer_genre("Yokyok", http_get=http_get) is None
+
+
+def test_fetch_deezer_genre_hata_none():
+    def http_get(url, timeout=None):
+        raise RuntimeError("ağ")
+    assert genre_source.fetch_deezer_genre("X", http_get=http_get) is None
+
+
+# --- fetch_best_genre: MB→iTunes→Deezer, KOVAYA OTURANI yeğler ---
+
+def test_fetch_best_genre_belirsizi_atlar():
+    # MB "turkish" (Diğer'e düşer) → Deezer "Pop" (oturur) tercih edilir
+    def http_get(url, headers=None, timeout=None):
+        if "musicbrainz" in url:
+            class R:
+                def json(self): return {"artists": [{"tags": [{"name": "turkish"}]}]}
+            return R()
+        if "itunes" in url:
+            return _FakeResp({"results": []})
+        if "search/artist" in url:
+            return _FakeResp({"data": [{"id": 1}]})
+        if "/albums" in url:
+            return _FakeResp({"data": [{"genre_id": 5}]})
+        if "/genre/5" in url:
+            return _FakeResp({"name": "Pop"})
+        return _FakeResp({})
+    assert genre_source.fetch_best_genre("Kamuran Akkor", http_get=http_get) == "Pop"
+
+
+def test_fetch_best_genre_hepsi_bos_none():
+    def http_get(url, headers=None, timeout=None):
+        if "musicbrainz" in url:
+            class R:
+                def json(self): return {"artists": []}
+            return R()
+        return _FakeResp({"results": [], "data": []})
+    assert genre_source.fetch_best_genre("Hayalet", http_get=http_get) is None
 
 
 # --- fetch_itunes_genre: sahte http_get ---

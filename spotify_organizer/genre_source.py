@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from urllib.parse import quote
 
 import requests
@@ -28,24 +29,50 @@ _BUCKETS = [
     ("House", ("house", "big room", "garage", "disco")),
     ("Drum & Bass", ("drum and bass", "dnb", "dubstep", "breakbeat", "jungle")),
     ("Trance", ("trance",)),
-    ("Elektronik", ("electronic", "edm", "electro", "dance")),
-    ("R&B", ("r&b", "rnb", "soul", "funk")),
+    ("Elektronik", ("electronic", "edm", "electro", "dance", "dans")),
+    ("R&B", ("r&b", "rnb", "rhythm and blues", "soul", "funk")),
     ("Rock", ("rock", "metal", "punk", "alternative", "grunge")),
+    # Dünya/tail türleri — DÜŞÜK öncelik: çok-türlü sanatçılarda (ör. Rolling Stones
+    # "rock…reggae", Temptations "soul…reggae") baskın tür kazansın, "reggae" minör
+    # etiketi çalmasın. Afrobeat→Latin→Reggae sırası: Burna Boy→Afrobeat, reggaeton→Latin.
+    ("Afrobeat", ("afrobeat", "afrobeats", "afrika", "african", "amapiano")),
+    ("Latin", ("latin", "sertanejo", "brazilian", "samba", "bossa", "reggaeton",
+               "forró", "forro", "cumbia", "axé")),
+    ("Reggae", ("reggae", "ragga", "ska", "dancehall")),
+    ("Jazz", ("jazz", "swing", "bebop")),
+    ("Blues", ("blues",)),
     ("Pop", ("pop",)),
 ]
 
 _ITUNES_URL = "https://itunes.apple.com/search"
 _MB_URL = "https://musicbrainz.org/ws/2/artist"
 _MB_UA = "SpotifyPlaylistOrganizer/1.0 (kisisel kullanim)"
+_DZ_SEARCH_ARTIST = "https://api.deezer.com/search/artist"
+_DZ_ARTIST = "https://api.deezer.com/artist"
+_DZ_GENRE = "https://api.deezer.com/genre"
+
+
+# Anahtar kelimeler KELİME-SINIRIYLA eşleşir (\b) → "dance" kelimesi eşleşir ama
+# "dancehall" İÇİNDE eşleşmez. Ayrıca "dance" tireli bileşiklerde (dance-rock,
+# dance-pop, dance-punk = rock/pop alt türleri) eşleşmez → o sanatçılar Rock/Pop kalır.
+def _kw_pattern(kw: str) -> str:
+    if kw == "dance":
+        return r"\bdance\b(?!-)"
+    return r"\b" + re.escape(kw) + r"\b"
+
+
+_BUCKET_PATTERNS = [
+    (bucket, re.compile("|".join(_kw_pattern(kw) for kw in keywords)))
+    for bucket, keywords in _BUCKETS
+]
 
 
 def itunes_to_bucket(itunes_genre: str) -> str:
-    """iTunes ham tür adını ana kovaya çevirir. Boş/eşleşme yok → 'Diğer'."""
+    """Ham tür adını ana kovaya çevirir (kelime-sınırı eşleşmesi). Boş/eşleşme yok → 'Diğer'."""
     g = (itunes_genre or "").lower()
-    for bucket, keywords in _BUCKETS:
-        for kw in keywords:
-            if kw in g:
-                return bucket
+    for bucket, pat in _BUCKET_PATTERNS:
+        if pat.search(g):
+            return bucket
     return OTHER
 
 
@@ -90,6 +117,47 @@ def fetch_musicbrainz_genre(artist_name: str, http_get=None) -> str | None:
         return joined or None
     except Exception:
         return None
+
+
+def fetch_deezer_genre(artist_name: str, http_get=None) -> str | None:
+    """Deezer'dan sanatçı türü (ANAHTARSIZ). Sanatçıyı ara → ilk album'un genre_id'si
+    → tür adı ('Rap/Hip Hop', 'Dans', 'Afrika müziği', 'Reggae' gibi).
+
+    MusicBrainz + iTunes None dönünce güçlü 3. kaynak: niş/underground rap (MAZ0),
+    yabancı sanatçıları bilir. itunes_to_bucket Deezer etiketlerini de kovaya çevirir.
+    Hata/boş → None.
+    """
+    if http_get is None:
+        http_get = requests.get
+    try:
+        s = (http_get(f"{_DZ_SEARCH_ARTIST}?q={quote(artist_name)}&limit=1",
+                      timeout=10).json().get("data") or [])
+        if not s:
+            return None
+        albums = (http_get(f"{_DZ_ARTIST}/{s[0]['id']}/albums?limit=5",
+                           timeout=10).json().get("data") or [])
+        for al in albums:
+            gid = al.get("genre_id")
+            if gid and gid != -1:
+                name = http_get(f"{_DZ_GENRE}/{gid}", timeout=10).json().get("name")
+                if name:
+                    return name
+        return None
+    except Exception:
+        return None
+
+
+def fetch_best_genre(artist_name: str, http_get=None) -> str | None:
+    """En iyi tür: MusicBrainz → iTunes → Deezer. KOVAYA OTURAN ilk sonucu yeğler
+    (ör. MB 'turkish' gibi belirsiz/eşleşmez veri verirse Deezer'a iner). Hiçbiri
+    oturmazsa ilk dolu ham değeri döndürür; hepsi boşsa None."""
+    results = [fetch_musicbrainz_genre(artist_name, http_get),
+               fetch_itunes_genre(artist_name, http_get),
+               fetch_deezer_genre(artist_name, http_get)]
+    for r in results:
+        if r and itunes_to_bucket(r) != OTHER:
+            return r
+    return next((r for r in results if r), None)
 
 
 def buckets_for_artists(artist_names, cache: dict, fetch=fetch_itunes_genre) -> dict:
