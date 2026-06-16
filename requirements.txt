@@ -3,3 +3,7 @@ spotipy>=2.23.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 pytest>=8.0.0
+# Yerel BPM/Camelot analizi (önizleme sesinden) — "bütün şarkıları bilen" hibrit için.
+# librosa ffmpeg gerektirir (brew install ffmpeg). Sadece prewarm_bpm.py kullanır.
+librosa>=0.10.0
+soundfile>=0.12.0
