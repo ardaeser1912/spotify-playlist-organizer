@@ -23,7 +23,7 @@ export default function PlaylistsView() {
     setSelected(id); setDetail(null); setDetailLoading(true); setModal(null); setError(null)
     api(`/api/playlist/${id}`)
       .then((r) => setDetail(r.data))
-      .catch(() => setError('Bu liste açılamadı — Spotify, geliştirici-modunda bazı takip-edilen listeleri kısıtlıyor. Beğenilenler ve kendi listelerin çalışır.'))
+      .catch(() => setError('Spotify, geliştirici-modunda playlist içeriğini kısıtlıyor (kendi listen olsa bile şarkı verisini vermiyor). Şu an sadece BEĞENİLENLER (981) tam çalışır — tüm araçlar orada. Listeler için Spotify "extended quota" onayı gerekir.'))
       .finally(() => setDetailLoading(false))
   }
 
