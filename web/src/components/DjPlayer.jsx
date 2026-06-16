@@ -13,7 +13,6 @@ import AlbumArt from './AlbumArt'
  * Props: open, tracks (sıralı [{id,title,artist,image,bpm,camelot}]), onClose
  */
 const BLEND_SEC = 7       // geçiş süresi (crossfade + beatmatch)
-const SKIP_BLEND = 2.5    // "Geç" ile hızlı ama yine de yumuşak
 
 // BPM oranını müzikal aralığa katla (yarı/çift tempo) → aşırı pitch bozulması olmasın.
 function beatmatchRatio(fromBpm, toBpm) {
@@ -180,7 +179,41 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
     else { ctx.resume(); setPlaying(true) }
   }
 
+  // İlerleme çubuğunda seek — Web Audio kaynağı seek edilemez → durdur + offset'ten yeniden başlat.
+  const seekTo = useCallback((fraction) => {
+    const ctx = ctxRef.current, cur = curRef.current
+    if (!ctx || !cur || blendingRef.current) return
+    const buf = bufRef.current.get(tracks[idxRef.current]?.id)
+    if (!buf) return
+    const offset = Math.max(0, Math.min(buf.duration - 0.2, fraction * buf.duration))
+    try { cur.source.stop() } catch { /* yok say */ }
+    const source = ctx.createBufferSource(); source.buffer = buf
+    const gain = ctx.createGain(); source.connect(gain); gain.connect(ctx.destination)
+    gain.gain.setValueAtTime(1, ctx.currentTime)
+    source.start(ctx.currentTime, offset)
+    curRef.current = { source, gain, bpm: cur.bpm, duration: buf.duration, startedAt: ctx.currentTime - offset }
+    if (ctx.state !== 'running') { ctx.resume(); setPlaying(true) }
+    setProgress(offset / buf.duration)
+  }, [tracks])
+
+  const [dragFrac, setDragFrac] = useState(null)
+  const barRef = useRef(null)
+  const fracFromEvent = (e) => {
+    const el = barRef.current; if (!el) return 0
+    const rect = el.getBoundingClientRect()
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  }
+  function onBarDown(e) { e.preventDefault(); setDragFrac(fracFromEvent(e)); e.currentTarget.setPointerCapture?.(e.pointerId) }
+  function onBarMove(e) { if (dragFrac == null) return; setDragFrac(fracFromEvent(e)) }
+  function onBarUp(e) { if (dragFrac == null) return; seekTo(fracFromEvent(e)); setDragFrac(null) }
+  function onBarKey(e) {
+    const base = dragFrac != null ? dragFrac : progress
+    if (e.key === 'ArrowRight') { e.preventDefault(); seekTo(Math.min(1, base + 0.05)) }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); seekTo(Math.max(0, base - 0.05)) }
+  }
+
   if (!open) return null
+  const barPct = Math.round((dragFrac != null ? dragFrac : progress) * 100)
 
   const cur = tracks[idx] || {}
   const next = tracks[idx + 1] || null
@@ -217,11 +250,18 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
             </div>
           </div>
 
-          {/* ilerleme */}
-          <div className="mt-4 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-2)' }}>
-            <div className="h-full rounded-full" style={{ width: `${Math.round(progress * 100)}%`, background: 'var(--amber)' }} />
+          {/* ilerleme — tıkla/sürükle ile ileri-geri */}
+          <div ref={barRef} className="mt-4 py-2 cursor-pointer select-none touch-none"
+               onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
+               onKeyDown={onBarKey} role="slider" tabIndex={0} aria-label="İlerleme · tıkla veya sürükle"
+               aria-valuenow={barPct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-1.5 rounded-full relative" style={{ background: 'var(--bg-2)' }}>
+              <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${barPct}%`, background: 'var(--amber)' }} />
+              <div className="absolute top-1/2 w-3 h-3 rounded-full -translate-x-1/2 -translate-y-1/2"
+                   style={{ left: `${barPct}%`, background: 'var(--amber)', boxShadow: '0 0 0 4px rgba(255,178,76,0.18)' }} />
+            </div>
           </div>
-          {status && <p className="text-xs text-[var(--faint)] mt-2">{status}</p>}
+          {status && <p className="text-xs text-[var(--faint)] mt-1">{status}</p>}
 
           {/* geçiş kartı → sıradaki */}
           {next && (
@@ -249,16 +289,25 @@ export default function DjPlayer({ open, tracks = [], onClose }) {
           )}
 
           {/* kontroller */}
-          <div className="mt-5 flex items-center justify-center gap-3">
+          <div className="mt-5 flex items-center justify-center gap-2.5 flex-wrap">
             <button className="btn btn-ghost" onClick={togglePlay} aria-label={playing ? 'Duraklat' : 'Çal'}>
               {playing ? '⏸ Duraklat' : '▶ Çal'}
             </button>
-            <button className="btn btn-primary" onClick={() => blendNext(SKIP_BLEND)} disabled={!next} aria-label="Sıradakine geç">
-              Geç ▶▶
+            <button className="btn btn-primary" onClick={() => blendNext(BLEND_SEC)} disabled={!next}
+                    aria-label="Geçişi hemen duy">
+              ⏭ Geçişi Duy
+            </button>
+            <button className="btn btn-ghost" disabled={!next} aria-label="Beklemeden sonraki parçaya atla"
+                    onClick={() => {
+                      try { curRef.current?.source?.stop() } catch { /* yok say */ }
+                      blendingRef.current = false; setBlending(false)
+                      startTrack(idxRef.current + 1, 0.25)
+                    }}>
+              ⏩ Sonraki
             </button>
           </div>
           <p className="text-[0.66rem] text-[var(--faint)] text-center mt-3">
-            30sn önizlemelerle gerçek beatmatch geçiş — giden parça yavaşlar, BPM uyar, sonraki üstüne biner. Tam şarkı için “Dışa Aktar”.
+            Çubuğu sürükle (ileri-geri) · <b>Geçişi Duy</b> = beklemeden beatmatch geçişi başlat · <b>Sonraki</b> = anında atla. 30sn önizleme; tam şarkı için “Dışa Aktar”.
           </p>
         </div>
       </div>
