@@ -224,6 +224,31 @@ def restore():
     return _run(lambda s, b: s.restore(b.get("file", "")))
 
 
+_PREVIEW_CACHE = "cache/previews.json"
+
+
+@app.get("/api/preview")
+def preview():
+    """DJ Modu için tek parçanın 30sn önizleme URL'i (Deezer→iTunes, diske cache).
+    Spotify'a DOKUNMAZ → gerçek modda rate-limit'i tetiklemez, DEMO'da da çalışır.
+    Çalar parçaları SIRAYLA ister (toplu değil) → istek-yolu ağ yükü minimal."""
+    from . import audio_bpm, enrich
+    artist = request.args.get("artist", "")
+    title = request.args.get("title", "")
+    if not (artist or title):
+        return _err("artist/title gerekli", 400)
+    os.makedirs("cache", exist_ok=True)
+    cache = enrich.load_cache(_PREVIEW_CACHE)
+    key = enrich._cache_key(title, artist)
+    if key not in cache:
+        try:
+            cache[key] = audio_bpm.preview_lookup(artist, title)
+            enrich.save_cache(_PREVIEW_CACHE, cache)
+        except Exception:  # noqa: BLE001 — önizleme bulunamazsa çalar parçayı atlar
+            cache[key] = None
+    return _ok({"url": cache.get(key)})
+
+
 @app.post("/api/refresh")
 def refresh():
     """Önbelleği temizle — kullanıcı Spotify'da şarkı ekleyince taze veri çekilsin."""

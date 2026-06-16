@@ -98,6 +98,17 @@ def itunes_preview(artist: str, title: str):
     return None
 
 
+def preview_lookup(artist: str, title: str):
+    """30sn önizleme URL'i (DJ Modu çalar için) — Deezer search.preview → iTunes yedek.
+    Birden çok sorgu varyantı dener (feat/remix/Türkçe-karakter kaçmasın). Yoksa None."""
+    a, t = _norm(artist), _norm(title)
+    for query in (f"{artist} {title}", f"{a} {t}", f"{a} {_strip_title(title)}"):
+        first = _deezer_search_one(query)
+        if first and first.get("preview"):
+            return first["preview"]
+    return itunes_preview(artist, title)
+
+
 def _octave_fix(tempo: float) -> int:
     """Yarı/çift tempo hatasını düzelt → 90–185 aralığına çek (modern müzik)."""
     while tempo < 90:

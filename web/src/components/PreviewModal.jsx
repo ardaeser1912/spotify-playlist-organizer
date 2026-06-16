@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api, post, fmtDuration, camelotColor, camelotCompatible } from '../lib/api'
 import AlbumArt from './AlbumArt'
+import DjPlayer from './DjPlayer'
 
 /**
  * Paylaşılan Önizle → Uygula akışı (güvenlik çekirdeği).
@@ -22,6 +23,7 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   const [applying, setApplying] = useState(false)
   const [done, setDone] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [djOpen, setDjOpen] = useState(false)
   const [isDemo, setIsDemo] = useState(true) // güvenli varsayım: DEMO (Uygula birincil)
 
   const dialogRef = useRef(null)
@@ -96,6 +98,8 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
   const nothingToApply = kind === 'dedupe' && data && data.removed_count === 0
   const isForbidden = !!error && /403|forbidden/i.test(error)
   const canExport = !!data
+  // DJ Modu yalnızca akış sıralamalarında (Geçişli Sırala / Akıllı Mix) anlamlı.
+  const canDj = kind === 'tracks' && Array.isArray(data?.tracks) && data.tracks.length > 0
 
   async function apply() {
     setApplying(true); setError(null)
@@ -172,7 +176,9 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
     }
   }
 
-  return createPortal(
+  return (
+    <>
+    {createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center p-4"
          style={{ background: 'rgba(4,4,7,0.66)', backdropFilter: 'blur(4px)' }}
          onClick={onClose}>
@@ -222,8 +228,13 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
                 engellediği için Dışa Aktar birincil, Uygula ikincil + ipucu. */}
             <div className="flex justify-end gap-3 flex-wrap">
               <button className="btn btn-ghost" onClick={onClose}>İptal</button>
+              {canDj && (
+                <button className="btn btn-primary" onClick={() => setDjOpen(true)}>
+                  ▶ DJ Çal
+                </button>
+              )}
               {!isForbidden && (isDemo ? (
-                <button className="btn btn-primary" onClick={apply}
+                <button className={`btn ${canDj ? 'btn-ghost' : 'btn-primary'}`} onClick={apply}
                         disabled={loading || applying || !!error || nothingToApply}>
                   {applying ? 'Uygulanıyor…' : nothingToApply ? 'Uygulanacak bir şey yok' : applyLabel}
                 </button>
@@ -242,11 +253,16 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
                       onClick={copyLinks} disabled={!canExport}>
                 {copied ? '✓ Kopyalandı' : '🔗 Linkleri Kopyala'}
               </button>
-              <button className={`btn ${(isForbidden || !isDemo) ? 'btn-primary' : 'btn-ghost'}`}
+              <button className={`btn ${(!canDj && (isForbidden || !isDemo)) ? 'btn-primary' : 'btn-ghost'}`}
                       onClick={exportCsv} disabled={!canExport}>
                 ⬇ Dışa Aktar (CSV)
               </button>
             </div>
+            {canDj && !isDemo && (
+              <p className="text-[0.66rem] text-[var(--faint)] mt-2 text-right">
+                Spotify’da tam şarkı: “Dışa Aktar (CSV)” → ücretsiz TuneMyMusic / Soundiiz ile içe aktar (sıra korunur).
+              </p>
+            )}
           </div>
         )}
         {done && (
@@ -264,6 +280,9 @@ export default function PreviewModal({ open, title, previewPath, applyPath, body
       </div>
     </div>,
     document.body,
+    )}
+    <DjPlayer open={djOpen} tracks={data?.tracks || []} onClose={() => setDjOpen(false)} />
+    </>
   )
 }
 

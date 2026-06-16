@@ -122,3 +122,42 @@ def test_gercek_mod_cachingclient_sarmalar(monkeypatch):
     from spotify_organizer.cache_layer import CachingClient
     svc = appmod._service()
     assert isinstance(svc.client, CachingClient)
+
+
+# ---------- DJ Modu önizleme ucu (/api/preview) — Spotify'a dokunmaz, diske cache ----------
+
+def test_preview_url_doner_ve_cacheler(client, monkeypatch, tmp_path):
+    calls = {"n": 0}
+
+    def fake_lookup(artist, title):
+        calls["n"] += 1
+        return "https://cdn.deezer.com/p.mp3"
+
+    import spotify_organizer.app as appmod
+    from spotify_organizer import audio_bpm
+    monkeypatch.setattr(audio_bpm, "preview_lookup", fake_lookup)
+    monkeypatch.setattr(appmod, "_PREVIEW_CACHE", str(tmp_path / "previews.json"))
+
+    r1 = client.get("/api/preview?artist=A%24AP%20Ferg&title=Plain%20Jane")
+    assert _data(r1)["url"] == "https://cdn.deezer.com/p.mp3"
+    # ikinci çağrı cache'ten gelir → lookup TEKRAR çağrılmaz
+    r2 = client.get("/api/preview?artist=A%24AP%20Ferg&title=Plain%20Jane")
+    assert _data(r2)["url"] == "https://cdn.deezer.com/p.mp3"
+    assert calls["n"] == 1
+
+
+def test_preview_bos_param_400(client):
+    r = client.get("/api/preview")
+    assert r.status_code == 400
+    assert r.get_json()["success"] is False
+
+
+def test_preview_lookup_deezer_sonra_itunes(monkeypatch):
+    from spotify_organizer import audio_bpm
+    # Deezer önizleme verir → onu döndürür
+    monkeypatch.setattr(audio_bpm, "_deezer_search_one", lambda q: {"preview": "http://dz.mp3"})
+    assert audio_bpm.preview_lookup("X", "Y") == "http://dz.mp3"
+    # Deezer boş → iTunes yedeğe düşer
+    monkeypatch.setattr(audio_bpm, "_deezer_search_one", lambda q: None)
+    monkeypatch.setattr(audio_bpm, "itunes_preview", lambda a, t: "http://it.mp3")
+    assert audio_bpm.preview_lookup("X", "Y") == "http://it.mp3"
