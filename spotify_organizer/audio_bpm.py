@@ -12,13 +12,36 @@ librosa + ffmpeg gerekir (yerel analiz). Ağ: Deezer + önizleme indirme.
 from __future__ import annotations
 
 import json
+import re
 import tempfile
+import unicodedata
 import urllib.parse
 import urllib.request
 
 _DEEZER_SEARCH = "https://api.deezer.com/search"
 _DEEZER_TRACK = "https://api.deezer.com/track"
+_ITUNES_SEARCH = "https://itunes.apple.com/search"
 _UA = {"User-Agent": "SpotifyPlaylistOrganizer/1.0"}
+
+# Başlıktaki gürültü: "(feat...)", "(with...)", "[...]", "- ... remix/remaster/edit/mix/version".
+_NOISE = re.compile(
+    r"\s*[\(\[][^)\]]*(feat|with|remix|remaster|edit|mix|version|prod|ft)[^)\]]*[\)\]]"
+    r"|\s*-\s*[^-]*(remix|remaster|edit|mix|version|live)[^-]*$",
+    re.IGNORECASE)
+
+
+def _norm(s: str) -> str:
+    """Unicode normalize (NFKC) + birleşik aksanları (Türkçe i̇) kaldır + sadeleştir."""
+    s = unicodedata.normalize("NFKC", s or "")
+    s = "".join(ch for ch in unicodedata.normalize("NFD", s)
+                if unicodedata.category(ch) != "Mn")
+    return s.strip()
+
+
+def _strip_title(title: str) -> str:
+    """feat/with/remix/remaster eklerini at → çekirdek başlık."""
+    t = _NOISE.sub("", title or "")
+    return _norm(t).strip() or _norm(title or "")
 
 # Pitch-class (0=C..11=B) + mod → Camelot. Major=B çemberi, minor=A çemberi.
 _MAJOR_CAMELOT = {0: "8B", 1: "3B", 2: "10B", 3: "5B", 4: "12B", 5: "7B",
@@ -33,14 +56,22 @@ def _get_json(url: str):
         return json.load(r)
 
 
-def deezer_lookup(artist: str, title: str):
-    """Deezer'da ara → (bpm|None, preview_url|None). Bulunamazsa (None, None)."""
-    q = urllib.parse.quote(f"{artist} {title}")
+def _deezer_search_one(query: str):
     try:
-        res = _get_json(f"{_DEEZER_SEARCH}?q={q}&limit=1").get("data") or []
-        if not res:
-            return None, None
-        first = res[0]
+        res = _get_json(f"{_DEEZER_SEARCH}?q={urllib.parse.quote(query)}&limit=1").get("data") or []
+        return res[0] if res else None
+    except Exception:
+        return None
+
+
+def deezer_lookup(artist: str, title: str):
+    """Deezer'da ara → (bpm|None, preview_url|None). Birden çok sorgu varyantı dener
+    (tam → temizlenmiş başlık → çekirdek başlık+sanatçı) ki feat/remix/Türkçe-karakter kaçmasın."""
+    a, t = _norm(artist), _norm(title)
+    for query in (f"{artist} {title}", f"{a} {t}", f"{a} {_strip_title(title)}", _strip_title(title)):
+        first = _deezer_search_one(query)
+        if not first:
+            continue
         preview = first.get("preview") or None
         bpm = None
         try:
@@ -51,8 +82,20 @@ def deezer_lookup(artist: str, title: str):
         except Exception:
             pass
         return bpm, preview
-    except Exception:
-        return None, None
+    return None, None
+
+
+def itunes_preview(artist: str, title: str):
+    """Deezer bulamazsa iTunes önizleme URL'i (yedek ses kaynağı). Yoksa None."""
+    for query in (f"{artist} {title}", f"{_norm(artist)} {_strip_title(title)}"):
+        try:
+            url = f"{_ITUNES_SEARCH}?term={urllib.parse.quote(query)}&entity=song&limit=1"
+            res = (_get_json(url).get("results") or [])
+            if res and res[0].get("previewUrl"):
+                return res[0]["previewUrl"]
+        except Exception:
+            continue
+    return None
 
 
 def _octave_fix(tempo: float) -> int:
@@ -110,10 +153,13 @@ def _estimate_camelot(y, sr, librosa, np):
 
 
 def get_bpm_camelot(artist: str, title: str):
-    """{bpm, camelot} — Deezer BPM varsa o, yoksa ses analizi. Bulunamazsa None."""
+    """{bpm, camelot} — Deezer BPM varsa o; ses analizi Deezer ya da iTunes önizlemesinden.
+    Hiçbir kaynakta yoksa None (sadece hiç katalogda olmayan çok-nadir parçalar)."""
     bpm, preview = deezer_lookup(artist, title)
+    if not preview:
+        preview = itunes_preview(artist, title)  # yedek ses kaynağı (Deezer bulamazsa)
     camelot = None
-    if preview and (bpm is None or camelot is None):
+    if preview:
         a_bpm, a_camelot = analyze_preview(preview)
         if bpm is None:
             bpm = a_bpm

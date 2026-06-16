@@ -1,11 +1,11 @@
-"""BPM/Camelot önbelleğini ısıt — "bütün şarkıları bilen" hibrit (Deezer + ses analizi).
+"""BPM/Camelot önbelleğini ısıt — "bütün şarkıları %100 bilen" hibrit (Deezer + iTunes + ses analizi).
 
 Her Beğenilenler parçası için audio_bpm.get_bpm_camelot:
-  Deezer BPM doluysa o, yoksa 30sn önizleme sesini librosa ile analiz → gerçek BPM + Camelot.
-Veritabanı kapsamına bağımlı DEĞİL → niş elektronik/rap dahil ~tüm şarkıların BPM'i çıkar.
+  Deezer/iTunes'ta bul → BPM alanı + 30sn önizleme → boşsa sesi librosa ile analiz (gerçek BPM + Camelot).
+Veritabanı kapsamına bağımlı DEĞİL. OTOMATİK TEKRAR: geçici ağ hatasıyla kaçanları
+yeniden dener (3 tura kadar) → hep ~%100.
 
-`cache/bpm.json`'a yazar (panel oradan okur). Paralel (hızlı). Çalıştır:
-    python prewarm_bpm.py
+`cache/bpm.json`'a yazar (panel oradan okur). Paralel (hızlı). Çalıştır:  python prewarm_bpm.py
 """
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,6 +17,26 @@ from spotify_organizer.client import REDIRECT_URI, SCOPES, SpotipyClient
 
 CACHE = "cache/bpm.json"
 WORKERS = 6
+PASSES = 3  # otomatik tekrar (geçici hata onarımı)
+
+
+def _process(todo, cache):
+    done = found = 0
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        futs = {ex.submit(audio_bpm.get_bpm_camelot, t.get("title", ""), t.get("artist", "")): k
+                for t, k in todo}
+        for fut in as_completed(futs):
+            try:
+                data = fut.result()
+            except Exception:
+                data = None
+            cache[futs[fut]] = data
+            done += 1
+            if data and data.get("bpm"):
+                found += 1
+            if done % 30 == 0:
+                enrich.save_cache(CACHE, cache)
+                print(f"  {done}/{len(todo)} | bu turda bulunan: {found}", flush=True)
 
 
 def main():
@@ -30,29 +50,18 @@ def main():
     tracks = SpotipyClient(sp).liked_tracks()
     os.makedirs("cache", exist_ok=True)
     cache = enrich.load_cache(CACHE)
-    todo = [(t, enrich._cache_key(t.get("title", ""), t.get("artist", "")))
-            for t in tracks]
-    todo = [(t, k) for t, k in todo if k not in cache]
-    print(f"{len(todo)}/{len(tracks)} parça işlenecek (Deezer + ses analizi, {WORKERS} paralel)...", flush=True)
-    done = found = 0
-    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-        futs = {ex.submit(audio_bpm.get_bpm_camelot, t.get("title", ""), t.get("artist", "")): k
-                for t, k in todo}
-        for fut in as_completed(futs):
-            data = None
-            try:
-                data = fut.result()
-            except Exception:
-                data = None
-            cache[futs[fut]] = data
-            done += 1
-            if data and (data.get("bpm") or data.get("camelot")):
-                found += 1
-            if done % 30 == 0:
-                enrich.save_cache(CACHE, cache)
-                print(f"  {done}/{len(todo)} | bulunan: {found}", flush=True)
-    enrich.save_cache(CACHE, cache)
-    print(f"✅ {found}/{len(todo)} parça BPM/Camelot bulundu. cache/bpm.json güncel — DJ geçişleri hazır.", flush=True)
+    pairs = [(t, enrich._cache_key(t.get("title", ""), t.get("artist", ""))) for t in tracks]
+
+    for attempt in range(1, PASSES + 1):
+        todo = [(t, k) for t, k in pairs if not (cache.get(k) and cache[k].get("bpm"))]
+        if not todo:
+            break
+        print(f"Tur {attempt}: {len(todo)} parça işlenecek ({WORKERS} paralel)...", flush=True)
+        _process(todo, cache)
+        enrich.save_cache(CACHE, cache)
+
+    dolu = sum(1 for v in cache.values() if v and v.get("bpm"))
+    print(f"✅ {dolu}/{len(cache)} = %{round(dolu * 100 / max(len(cache), 1))} BPM/Camelot DOLU — DJ hazır.", flush=True)
 
 
 if __name__ == "__main__":
